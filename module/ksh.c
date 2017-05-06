@@ -49,27 +49,27 @@ long ksh_ioctl(struct file * file, unsigned int cmd, unsigned long arg) {
 	
 	switch(cmd)
 	{
-		case LIST:
+		case IO_LIST:
 			INIT_WORK(data->work,list);
 			schedule_work(data->work);
 			break;
-		case FG:
+		case IO_FG:
 			INIT_WORK(data->work,foreground);
 			schedule_work(data->work);
 			break;
-		case KILL:
+		case IO_KILL:
 			INIT_WORK(data->work,mykill);
 			schedule_work(data->work);
 			break;
-		case WAIT:
+		case IO_WAIT:
 			INIT_WORK(data->work,mywait);
 			schedule_work(data->work);
 			break;
-		case MEM:
+		case IO_MEM:
 			INIT_WORK(data->work,meminfo);
 			schedule_work(data->work);
 			break;
-		case MOD:
+		case IO_MOD:
 			INIT_WORK(data->work,modinfo);
 			schedule_work(data->work);
 			break;

@@ -158,7 +158,7 @@ void cmd_parse(char *cmd)
         			for(int j = 0; j < argc; j++) {
         				tok2 = strtok(NULL, delim);
         				//TODO: sscanf recopie pas les valeurs des pids
-        				if(tok2 == NULL || (!sscanf(tok2, "%d", &args[1].l.pids[i]))) {
+        				if(tok2 == NULL || (!sscanf(tok2, "%d", &args[1].l.pids[j]))) {
         					free(args[1].l.pids);
         					ESCAPE("Bad Argument(s)");
         				}
