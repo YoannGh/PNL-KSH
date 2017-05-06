@@ -58,7 +58,7 @@ cmd_t cmd_table[CMD_COUNT] ={
     CMD(list, "", "Display currently executed commands", LIST),
     CMD(fg, "<id>", "Wait for command 'id' to finish", FG),
     CMD(kill, "<signal> <pid>", "Send 'signal' to process corresponding to 'pid'", KILL),
-    CMD(wait, "<pid>...", "Wait for one process specified by its 'pid' to terminate", WAIT),
+    CMD(wait, "<pid> [<pid> ...]", "Wait for one process specified by its 'pid' to terminate", WAIT),
     CMD(meminfo, "", "Get information concerning memory usage", MEMINFO),
     CMD(modinfo, "<module>", "Get information concerning loaded kernel 'module'", MODINFO),
     CMD(help, "", "Display this help", HELP),
@@ -104,7 +104,7 @@ void cmd_parse(char *cmd)
 
 	cmd_cpy = (char *) malloc((strlen(cmd) + 1) * sizeof(char));
 	if(cmd_cpy == NULL) {
-		printf("malloc failed, exiting ...\n");
+		puts("malloc failed, exiting ...");
 		exit(-1);
 	}
 	memcpy(cmd_cpy, cmd, strlen(cmd)+1);
@@ -119,7 +119,7 @@ void cmd_parse(char *cmd)
 	// alloc one more arg for async flag
 	args = (arg_t *) malloc(sizeof(arg_t) * (argc + 1));
 	if(args == NULL) {
-		printf("malloc failed, exiting ...\n");
+		puts("malloc failed, exiting ...");
 		exit(-1);
 	}
 
