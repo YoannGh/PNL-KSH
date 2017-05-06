@@ -12,7 +12,7 @@ INCDIR   = module
 OBJDIR   = obj
 BINDIR   = bin
 
-BIN_NAME = ksh-tool
+BIN_NAME = ksh_tool
 
 SOURCES  := $(wildcard $(SRCDIR)/*.c)
 INCLUDES := $(wildcard $(INCDIR)/*.h)
