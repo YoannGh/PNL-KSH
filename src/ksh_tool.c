@@ -9,18 +9,6 @@
 
 #include "ksh.h"
 
-typedef struct {
-	int *pids;
-	int count;
-} pid_list;
-
-typedef union {
-    unsigned short is_async;
-    int c;
-    char *s;
-    pid_list l;
-} arg_t;
-
 typedef enum {
 	LIST,
 	FG,

@@ -4,15 +4,32 @@
 #include <linux/fs.h>
 #include <asm/uaccess.h>
 #include <linux/string.h>
-#include <linux/workqueue.h>
-#include "helloioctl.h"
 
-MODULE_DESCRIPTION("Module helloioctl pour noyau linux");
+#include <linux/workqueue.h>
+#include <linux/list.h>
+#include <linux/mutex.h>
+
+#include "ksh.h"
+
+MODULE_DESCRIPTION("Module ksh pour noyau linux");
 MODULE_AUTHOR("F et Y, M1SAR");
 MODULE_LICENSE("GPL");
 
-int major;
+typedef struct {
+	struct list_head cmd_list;
+	struct mutex lock_cmd_list;
+	unsigned int cmd_count;
+} ksh_ctx_t;
+static ksh_ctx_t *ksh_ctx;
 
+typedef struct {
+	cmd_io_t cmd_args;
+	struct list_head l_next;
+	struct work_struct work;
+    struct file  *file;
+} ksh_cmd_t;
+
+int major;
 
 void  list(struct work_struct*){
 	//exemple pour récuperer arguments:
@@ -41,11 +58,11 @@ void modinfo(struct work_struct*){
 }
 
 
-long ksh_ioctl(struct file * file, unsigned int cmd, unsigned long arg) {
+static long ksh_ioctl(struct file * file, unsigned int cmd, unsigned long arg) {
 
-	struct work_data data = kmalloc(sizeof(work_data));// déclarée dans le .h permet de hack aux niveaux des structures pour récuperer les arguments dans les fonctions passées aux workqueues
-	data.file = file;
-	data.arg = (char*) arg; //possibilité de check si c'est synchrone, mettre le '&' comme le 1er argument, et check ici
+	ksh_cmd_t cmd = kmalloc(sizeof(ksh_cmd_t));// déclarée dans le .h permet de hack aux niveaux des structures pour récuperer les arguments dans les fonctions passées aux workqueues
+	cmd.file = file;
+	cmd.arg = (char*) arg; //possibilité de check si c'est synchrone, mettre le '&' comme le 1er argument, et check ici
 	
 	switch(cmd)
 	{
@@ -83,13 +100,17 @@ long ksh_ioctl(struct file * file, unsigned int cmd, unsigned long arg) {
 
 static int __init ksh_init(void)
 {
-	const struct file_operations hellofops = {.unlocked_ioctl = &ksh_ioctl, };
-	pr_info("Hello, IOCTL\n");
+	const struct file_operations ksh_fops = {.unlocked_ioctl = &ksh_ioctl, };
+	pr_info("Init KSH IOCTL\n");
 
-	//hellofops.unlocked_ioctl = &hello_ioctl;
-	major = register_chrdev(0, "hello", &hellofops);
+	major = register_chrdev(0, "ksh", &ksh_fops);
 
-	pr_info("helloioctl major: %d\n", major);
+	pr_info("ksh_ioctl major: %d\n", major);
+
+	ksh_ctx = kmalloc(sizeof(ksh_ctx_t), GFP_KERNEL);
+	INIT_LIST_HEAD(&(ksh_ctx->cmd_list));
+	ksh_ctx->cmd_count = 0;
+	mutex_init(&ksh_ctx->lock_cmd_list);
 
 	return 0;
 }
@@ -97,8 +118,8 @@ module_init(ksh_init);
 
 static void __exit ksh_exit(void)
 {
-	pr_info("Goodbye, IOCTL\n");
+	pr_info("Exit KSH IOCTL\n");
 
-	unregister_chrdev(major, "hello");
+	unregister_chrdev(major, "ksh");
 }
 module_exit(ksh_exit);
