@@ -4,6 +4,10 @@
 /* Params IN */
 
 typedef struct  {
+	unsigned int list_size;
+} cmd_list_args;
+
+typedef struct  {
 	unsigned long cmd_id;
 } cmd_fg_args;
 
@@ -25,14 +29,14 @@ typedef struct {
 /* Params OUT */
 
 typedef struct {
-	//TODO:
 	unsigned long cmd_id;
 	int cmd_type;
-	union {
-		cmd_kill_args kill_args;
-		cmd_wait_args wait_args;
-		cmd_modinfo_args modinfo_args;
-	};
+	unsigned short is_async;
+} cmd_list_elem;
+
+typedef struct {
+	unsigned int elem_count;
+	cmd_list_elem *list;
 } cmd_list_resp;
 
 typedef struct {
@@ -70,6 +74,7 @@ typedef struct {
 	/* IN args */
 	int ioctl_type;
 	union {
+		cmd_list_args list_args;
 		cmd_fg_args fg_args;
 		cmd_kill_args kill_args;
 		cmd_wait_args wait_args;
@@ -83,7 +88,7 @@ typedef struct {
 		cmd_wait_resp wait_resp;
 		cmd_meminfo_resp meminfo_resp;
 		cmd_modinfo_resp modinfo_resp;
-		int cmd_id;
+		unsigned long cmd_id;
 	};
 } cmd_io_t;
 
@@ -95,7 +100,7 @@ typedef struct {
 #define IO_WAIT _IOWR(KSH_IOC_MAGIC, 4, cmd_io_t)
 #define IO_MEM _IOWR(KSH_IOC_MAGIC, 5, cmd_io_t)
 #define IO_MOD _IOWR(KSH_IOC_MAGIC, 6, cmd_io_t)
-#define IO_LIST_SIZE _IOR(KSH_IOC_MAGIC, 7, int)
+#define IO_LIST_SIZE _IOR(KSH_IOC_MAGIC, 7, unsigned int)
 
 #define KSH_IOC_MAXNR 7
 
