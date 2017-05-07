@@ -19,7 +19,7 @@ typedef struct {
 
 typedef struct {
 	char *str_ptr;
-	unsigned int str_length;
+	unsigned int str_len;
 } cmd_modinfo_args;
 
 /* Params OUT */
@@ -70,15 +70,18 @@ typedef struct {
 		cmd_modinfo_resp modinfo_resp;
 		int cmd_id;
 	};
+	unsigned short is_async;
 } cmd_io_t;
 
-#define IO_MAGICNUMBER 'N'
+#define KSH_IOC_MAGIC 'N'
 
-#define IO_LIST _IOWR(IO_MAGICNUMBER, 1, cmd_io_t)
-#define IO_FG _IOWR(IO_MAGICNUMBER, 2, cmd_io_t)
-#define IO_KILL _IOWR(IO_MAGICNUMBER, 3, cmd_io_t)
-#define IO_WAIT _IOWR(IO_MAGICNUMBER, 4, cmd_io_t)
-#define IO_MEM _IOWR(IO_MAGICNUMBER, 5, cmd_io_t)
-#define IO_MOD _IOWR(IO_MAGICNUMBER, 6, cmd_io_t)
+#define IO_LIST _IOWR(KSH_IOC_MAGIC, 1, cmd_io_t)
+#define IO_FG _IOWR(KSH_IOC_MAGIC, 2, cmd_io_t)
+#define IO_KILL _IOWR(KSH_IOC_MAGIC, 3, cmd_io_t)
+#define IO_WAIT _IOWR(KSH_IOC_MAGIC, 4, cmd_io_t)
+#define IO_MEM _IOWR(KSH_IOC_MAGIC, 5, cmd_io_t)
+#define IO_MOD _IOWR(KSH_IOC_MAGIC, 6, cmd_io_t)
+
+#define KSH_IOC_MAXNR 6
 
 #endif

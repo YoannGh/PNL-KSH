@@ -21,14 +21,26 @@ typedef enum {
 } cmd_id;
 
 typedef struct {
+	int *pids;
+	int count;
+} pid_list;
+
+typedef union {
+    unsigned short is_async;
+    int c;
+    char *s;
+    pid_list l;
+} arg_t;
+
+typedef struct {
     const char *name;
-    void (*func)(arg_t*);
+    void (*func)(int ioctl_fd, arg_t*);
     const char *args;
     const char *desc;
     const cmd_id uid;
 } cmd_t;
 
-#define MK_CMD(name) void cmd_ ## name (arg_t* args)
+#define MK_CMD(name) void cmd_ ## name (int ioctl_fd, arg_t* args)
 MK_CMD(list);
 MK_CMD(fg);
 MK_CMD(kill);
@@ -58,7 +70,7 @@ const char *delim = " \r\n";
 const char args_separator = ' ';
 
 #define ESCAPE(str) {free(cmd_cpy); free(args); puts(str); return;}
-void cmd_parse(char *cmd)
+void cmd_parse(int ioctl_fd, char *cmd)
 {
 	int argc;
 	int i;
@@ -122,17 +134,17 @@ void cmd_parse(char *cmd)
         		case LIST:
         			if(argc != 0)
         				ESCAPE("Bad Argument(s)");
-        			cur.func(args);
+        			cur.func(ioctl_fd, args);
         			break;
         		case FG:
         			if(argc != 1 || (!sscanf(args_ptr, "%d", &args[1].c)))
         				ESCAPE("Bad Argument(s)");
-        			cur.func(args);
+        			cur.func(ioctl_fd, args);
         			break;
         		case KILL:
         			if(argc != 2 || (!sscanf(args_ptr, "%d %d", &args[1].c, &args[2].c)))
         				ESCAPE("Bad Argument(s)");
-        			cur.func(args);
+        			cur.func(ioctl_fd, args);
         			break;
         		case WAIT:
         			if(argc < 1)
@@ -145,35 +157,34 @@ void cmd_parse(char *cmd)
 
         			for(int j = 0; j < argc; j++) {
         				tok2 = strtok(NULL, delim);
-        				//TODO: sscanf recopie pas les valeurs des pids
         				if(tok2 == NULL || (!sscanf(tok2, "%d", &args[1].l.pids[j]))) {
         					free(args[1].l.pids);
         					ESCAPE("Bad Argument(s)");
         				}
         			}
-        			cur.func(args);
+        			cur.func(ioctl_fd, args);
         			free(args[1].l.pids);
         			break;
         		case MEMINFO:
         			if(argc != 0)
         				ESCAPE("Bad Argument(s)");
-        			cur.func(args);	
+        			cur.func(ioctl_fd, args);	
         			break;
         		case MODINFO:
 					if(argc != 1 || (*args_ptr) == ' ' || (*args_ptr) == '\0') 
         				ESCAPE("Bad Argument(s)");
         			args[1].s = args_ptr;
-        			cur.func(args);
+        			cur.func(ioctl_fd, args);
         			break;
         		case HELP:
         			if(argc != 0)
         				ESCAPE("Bad Argument(s)");
-        			cur.func(args);
+        			cur.func(ioctl_fd, args);
         			break;
         		case EXIT:
         			if(argc != 0)
         				ESCAPE("Bad Argument(s)");
-        			cur.func(args);
+        			cur.func(ioctl_fd, args);
         			break;
         		default:
         			ESCAPE("Command not found");
@@ -193,56 +204,144 @@ void cmd_parse(char *cmd)
 
 int main()
 {
+    int ioctl_fd;
     char cmd[512];
+	char *device_path = "/dev/ksh";
+
+    if((ioctl_fd = open(device_path, O_RDWR)) < 0) {
+    	printf("Error opening character device at %s\n", device_path);
+    	perror("");
+    	exit(EXIT_FAILURE);
+    }
+
     while(1) {
         printf("%s", PROMPT);
         fflush(stdout);
-        cmd_parse(fgets(cmd, 512, stdin));
+        cmd_parse(ioctl_fd, fgets(cmd, 512, stdin));
     }
+
+    close(ioctl_fd);
 
     return 0;
 }
 
-void cmd_list(arg_t *args) 
+void cmd_list(int ioctl_fd, arg_t *args) 
 {
+	cmd_io_t cmd;
 	printf("Exec list: async=%hu\n", args[0].is_async);
+
+	cmd.ioctl_type = IO_LIST;
+	cmd.is_async = args[0].is_async;
+
+	if (ioctl(ioctl_fd, cmd.ioctl_type, &cmd) == -1) {
+		puts("ioctl list failed");
+		return;
+	}
+
+	//TODO: Get result
 }
 
-void cmd_fg(arg_t *args)
+void cmd_fg(int ioctl_fd, arg_t *args)
 {
+	cmd_io_t cmd;
 	printf("Exec fg: async=%hu id=%d\n", args[0].is_async, args[1].c);
+
+	cmd.ioctl_type = IO_FG;
+	cmd.is_async = args[0].is_async;
+	cmd.fg_args.cmd_id = args[1].c;
+
+	if (ioctl(ioctl_fd, cmd.ioctl_type, &cmd) == -1) {
+		puts("ioctl fg failed");
+		return;
+	}
+
+	//TODO: Get result
 }
 
-void cmd_kill(arg_t *args)
+void cmd_kill(int ioctl_fd, arg_t *args)
 {
+	cmd_io_t cmd;
 	printf("Exec kill: async=%hu signal=%d pid=%d\n", args[0].is_async, args[1].c, args[2].c);
+
+	cmd.ioctl_type = IO_KILL;
+	cmd.is_async = args[0].is_async;
+	cmd.kill_args.signal = args[1].c;
+	cmd.kill_args.pid = args[2].c;
+
+	if (ioctl(ioctl_fd, cmd.ioctl_type, &cmd) == -1) {
+		puts("ioctl kill failed");
+		return;
+	}
+
+	//TODO: Get result
 }
 
-void cmd_wait(arg_t *args)
+void cmd_wait(int ioctl_fd, arg_t *args)
 {
+	cmd_io_t cmd;
 	printf("Exec wait: async=%hu ", args[0].is_async);
 	for(int i = 0; i < args[1].l.count; i++) {
 		printf("pid=%d ", args[1].l.pids[i]);
 	}
 	printf("\n");
+
+	cmd.ioctl_type = IO_WAIT;
+	cmd.is_async = args[0].is_async;
+	cmd.wait_args.pid_count = args[1].l.count;
+	cmd.wait_args.pids = args[1].l.pids;
+
+	if (ioctl(ioctl_fd, cmd.ioctl_type, &cmd) == -1) {
+		puts("ioctl kill failed");
+		return;
+	}
+
+	//TODO: Get result
 }
 
-void cmd_meminfo(arg_t *args)
+void cmd_meminfo(int ioctl_fd, arg_t *args)
 {
+	cmd_io_t cmd;
 	printf("Exec meminfo: async=%hu\n", args[0].is_async);
+
+	cmd.ioctl_type = IO_MEM;
+	cmd.is_async = args[0].is_async;
+
+	if (ioctl(ioctl_fd, cmd.ioctl_type, &cmd) == -1) {
+		puts("ioctl meminfo failed");
+		return;
+	}
+
+	//TODO: Get result
 }
 
-void cmd_modinfo(arg_t *args)
+void cmd_modinfo(int ioctl_fd, arg_t *args)
 {
+	cmd_io_t cmd;
+	unsigned int length;
 	printf("Exec modinfo: async=%hu module_name=%s\n", args[0].is_async, args[1].s);
+
+	length = strcspn(args[1].s, " \0");
+	args[1].s[length] = '\0';
+
+	cmd.ioctl_type = IO_MOD;
+	cmd.is_async = args[0].is_async;
+	cmd.modinfo_args.str_len = length + 1;
+	cmd.modinfo_args.str_ptr = args[1].s;
+
+	if (ioctl(ioctl_fd, cmd.ioctl_type, &cmd) == -1) {
+		puts("ioctl modinfo failed");
+		return;
+	}
+
+	//TODO: Get result
 }
 
-void cmd_exit(arg_t *args) 
+void cmd_exit(int ioctl_fd, arg_t *args) 
 {
-	exit(0);
+	exit(EXIT_SUCCESS);
 }
 
-void cmd_help(arg_t *args)
+void cmd_help(int ioctl_fd, arg_t *args)
 {
     puts("Available Commands:");
     int i = CMD_COUNT;
