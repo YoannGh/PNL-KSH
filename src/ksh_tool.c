@@ -238,7 +238,13 @@ void cmd_list(int ioctl_fd, arg_t *args)
 		return;
 	}
 
-	//TODO: Get result
+	if(cmd.is_async) {
+		printf("Async Command running with id: %d\n", cmd.cmd_id);
+		return;
+	} else {
+		//TODO: Get result
+	}
+
 }
 
 void cmd_fg(int ioctl_fd, arg_t *args)
@@ -255,7 +261,12 @@ void cmd_fg(int ioctl_fd, arg_t *args)
 		return;
 	}
 
-	//TODO: Get result
+	if(cmd.is_async) {
+		printf("Async Command running with id: %d\n", cmd.cmd_id);
+		return;
+	} else {
+		//TODO: Get result
+	}
 }
 
 void cmd_kill(int ioctl_fd, arg_t *args)
@@ -273,7 +284,23 @@ void cmd_kill(int ioctl_fd, arg_t *args)
 		return;
 	}
 
-	//TODO: Get result
+	if(cmd.is_async) {
+		printf("Async Command running with id: %d\n", cmd.cmd_id);
+		return;
+	} else {
+		if(cmd.kill_resp.ret == -1) {
+			puts("Unknown signal argument");
+		}
+		else if(cmd.kill_resp.ret == -2) {
+			printf("Process with pid %d not found\n", cmd.kill_args.pid);
+		}
+		else if(cmd.kill_resp.ret < 0) {
+			printf("Error sending signal %d to pid %d\n",cmd.kill_args.signal, cmd.kill_args.pid);
+		}
+		else {
+			printf("Successfuly sent signal %d to pid %d\n",cmd.kill_args.signal, cmd.kill_args.pid);
+		}
+	}
 }
 
 void cmd_wait(int ioctl_fd, arg_t *args)
@@ -295,7 +322,12 @@ void cmd_wait(int ioctl_fd, arg_t *args)
 		return;
 	}
 
-	//TODO: Get result
+	if(cmd.is_async) {
+		printf("Async Command running with id: %d\n", cmd.cmd_id);
+		return;
+	} else {
+		//TODO: Get result
+	}
 }
 
 void cmd_meminfo(int ioctl_fd, arg_t *args)
@@ -311,7 +343,12 @@ void cmd_meminfo(int ioctl_fd, arg_t *args)
 		return;
 	}
 
-	//TODO: Get result
+	if(cmd.is_async) {
+		printf("Async Command running with id: %d\n", cmd.cmd_id);
+		return;
+	} else {
+		//TODO: Get result
+	}
 }
 
 void cmd_modinfo(int ioctl_fd, arg_t *args)
@@ -333,7 +370,12 @@ void cmd_modinfo(int ioctl_fd, arg_t *args)
 		return;
 	}
 
-	//TODO: Get result
+	if(cmd.is_async) {
+		printf("Async Command running with id: %d\n", cmd.cmd_id);
+		return;
+	} else {
+		//TODO: Get result
+	}
 }
 
 void cmd_exit(int ioctl_fd, arg_t *args) 

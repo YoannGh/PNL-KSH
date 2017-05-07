@@ -25,8 +25,19 @@ typedef struct {
 /* Params OUT */
 
 typedef struct {
-	unsigned int list_size;
+	//TODO:
+	unsigned long cmd_id;
+	int cmd_type;
+	union {
+		cmd_kill_args kill_args;
+		cmd_wait_args wait_args;
+		cmd_modinfo_args modinfo_args;
+	};
 } cmd_list_resp;
+
+typedef struct {
+	int ret;
+} cmd_kill_resp;
 
 typedef struct {
 	int pid;
@@ -46,16 +57,17 @@ typedef struct {
 	unsigned long mapped_addr;
 } cmd_modinfo_resp;
 
-typedef union {
+/*typedef union {
 	cmd_list_resp list_resp;
 	cmd_wait_resp wait_resp;
 	cmd_meminfo_resp meminfo_resp;
 	cmd_modinfo_resp modinfo_resp;
-} cmd_fg_resp;
+} cmd_fg_resp;*/
 
 /* cmd_io_t: struct for communication between user and kernel space */
 
 typedef struct {
+	/* IN args */
 	int ioctl_type;
 	union {
 		cmd_fg_args fg_args;
@@ -63,14 +75,16 @@ typedef struct {
 		cmd_wait_args wait_args;
 		cmd_modinfo_args modinfo_args;
 	};
+	unsigned short is_async;
+	/* OUT Args */
 	union {
 		cmd_list_resp list_resp;
+		cmd_kill_resp kill_resp;
 		cmd_wait_resp wait_resp;
 		cmd_meminfo_resp meminfo_resp;
 		cmd_modinfo_resp modinfo_resp;
 		int cmd_id;
 	};
-	unsigned short is_async;
 } cmd_io_t;
 
 #define KSH_IOC_MAGIC 'N'
@@ -81,7 +95,8 @@ typedef struct {
 #define IO_WAIT _IOWR(KSH_IOC_MAGIC, 4, cmd_io_t)
 #define IO_MEM _IOWR(KSH_IOC_MAGIC, 5, cmd_io_t)
 #define IO_MOD _IOWR(KSH_IOC_MAGIC, 6, cmd_io_t)
+#define IO_LIST_SIZE _IOR(KSH_IOC_MAGIC, 7, int)
 
-#define KSH_IOC_MAXNR 6
+#define KSH_IOC_MAXNR 7
 
 #endif
