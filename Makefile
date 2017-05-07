@@ -1,6 +1,6 @@
 CC       = gcc
 # compiling flags here
-CFLAGS   = -Wall -Wextra -std=c99
+CFLAGS   = -Wall -Wextra -Wunused-parameter -std=c99
 
 LINKER   = gcc
 # linking flags here

@@ -168,9 +168,13 @@ static long ksh_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 
 }
 
+static struct file_operations ksh_fops = {
+	.unlocked_ioctl = ksh_ioctl
+};
+
 static int __init ksh_init(void)
 {
-	const struct file_operations ksh_fops = {.unlocked_ioctl = &ksh_ioctl, };
+	//const struct file_operations ksh_fops = {.unlocked_ioctl = &ksh_ioctl, };
 	pr_info("Init KSH IOCTL\n");
 
 	major = register_chrdev(0, "ksh", &ksh_fops);
