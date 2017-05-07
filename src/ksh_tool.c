@@ -260,7 +260,7 @@ void cmd_list(int ioctl_fd, arg_t *args)
 	}
 
 	if(cmd.is_async) {
-		printf("Async Command running with id: %d\n", cmd.cmd_id);
+		printf("Async Command running with id: %lu\n", cmd.cmd_id);
 		return;
 	} else {
 		handle_print_list(&cmd.list_resp);
@@ -329,7 +329,7 @@ void cmd_kill(int ioctl_fd, arg_t *args)
 	}
 
 	if(cmd.is_async) {
-		printf("Async Command running with id: %d\n", cmd.cmd_id);
+		printf("Async Command running with id: %lu\n", cmd.cmd_id);
 		return;
 	} else {
 		handle_print_kill(&cmd.kill_resp);
@@ -356,7 +356,7 @@ void cmd_wait(int ioctl_fd, arg_t *args)
 	}
 
 	if(cmd.is_async) {
-		printf("Async Command running with id: %d\n", cmd.cmd_id);
+		printf("Async Command running with id: %lu\n", cmd.cmd_id);
 		return;
 	} else {
 		handle_print_wait(&cmd.wait_resp);
@@ -377,10 +377,10 @@ void cmd_meminfo(int ioctl_fd, arg_t *args)
 	}
 
 	if(cmd.is_async) {
-		printf("Async Command running with id: %d\n", cmd.cmd_id);
+		printf("Async Command running with id: %lu\n", cmd.cmd_id);
 		return;
 	} else {
-		handle_print_wait(&cmd.meminfo_resp);
+		handle_print_meminfo(&cmd.meminfo_resp);
 	}
 }
 
@@ -404,10 +404,10 @@ void cmd_modinfo(int ioctl_fd, arg_t *args)
 	}
 
 	if(cmd.is_async) {
-		printf("Async Command running with id: %d\n", cmd.cmd_id);
+		printf("Async Command running with id: %lu\n", cmd.cmd_id);
 		return;
 	} else {
-		handle_print_wait(&cmd.modinfo_resp);
+		handle_print_modinfo(&cmd.modinfo_resp);
 	}
 }
 
@@ -429,44 +429,44 @@ void cmd_help(int ioctl_fd, arg_t *args)
 }
 
 void handle_print_list(cmd_list_resp *list_resp) {
-	int i;
+	unsigned int i;
 
 	printf("list_size 2nd ioctl: %d\n", list_resp->elem_count);
-		for(i = 0; i < list_resp->elem_count) {
+		for(i = 0; i < list_resp->elem_count; i++) {
 			switch(list_resp->list[i].cmd_type) {
 				case IO_LIST:
 					printf("Command %lu : %s Async=%hu\n", 
-						list_resp->list[i].cmd_id
+						list_resp->list[i].cmd_id,
 						"LIST", list_resp->list[i].is_async);
 					break;
 				case IO_FG:
 					printf("Command %lu : %s Async=%hu\n", 
-						list_resp->list[i].cmd_id
+						list_resp->list[i].cmd_id,
 						"FG", list_resp->list[i].is_async);
 					break;
 				case IO_KILL:
 					printf("Command %lu : %s Async=%hu\n", 
-						list_resp->list[i].cmd_id
+						list_resp->list[i].cmd_id,
 						"KILL", list_resp->list[i].is_async);
 					break;
 				case IO_WAIT:
 					printf("Command %lu : %s Async=%hu\n", 
-						list_resp->list[i].cmd_id
+						list_resp->list[i].cmd_id,
 						"WAIT", list_resp->list[i].is_async);
 					break;
 				case IO_MEM:
 					printf("Command %lu : %s Async=%hu\n", 
-						list_resp->list[i].cmd_id
+						list_resp->list[i].cmd_id,
 						"MEMINFO", list_resp->list[i].is_async);
 					break;
 				case IO_MOD:
 					printf("Command %lu : %s Async=%hu\n", 
-						list_resp->list[i].cmd_id
+						list_resp->list[i].cmd_id,
 						"MODINFO", list_resp->list[i].is_async);
 					break;
 				default:
 					printf("Command %lu : %s Async=%hu\n", 
-						list_resp->list[i].cmd_id
+						list_resp->list[i].cmd_id,
 						"???", list_resp->list[i].is_async);
 					break;
 			}

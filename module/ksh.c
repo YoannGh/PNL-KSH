@@ -55,25 +55,30 @@ struct ksh_cmd {
     cmd_io_t *user_cmd;
 };
 
-static void wait_and_give_resp(struct ksh_cmd *cmd, cmd_io_t *user_cmd) {
-	wait_event(cmd->wait_done, cmd->is_finished);
-
+static void remove_from_cmd_list(struct ksh_cmd *cmd) {
 	mutex_lock(&ksh_ctx->lock_ctx);
 	list_del(&cmd->l_next);
 	ksh_ctx->list_size--;
 	mutex_unlock(&ksh_ctx->lock_ctx);
+}
+
+static void wait_and_give_resp(struct ksh_cmd *cmd, cmd_io_t *user_cmd) {
+	wait_event(cmd->wait_done, cmd->is_finished);
+
+	remove_from_cmd_list(cmd);
 
 	/* Change Cmd type for FG cmd to the command it waited */
 	if(user_cmd->ioctl_type == IO_FG) {
 		copy_to_user(&user_cmd->ioctl_type, 
 			&cmd->args.ioctl_type, sizeof(int));
+		pr_info("Changed ioctl_type to %d\n", cmd->args.ioctl_type);
 	}
 
 	switch(cmd->args.ioctl_type)
 	{
 		case IO_LIST:
-			copy_to_user(&user_cmd->list_resp.list, 
-				&cmd->args.list_resp.list, 
+			copy_to_user(user_cmd->list_resp.list, 
+				cmd->args.list_resp.list, 
 				cmd->args.list_resp.elem_count * sizeof(cmd_list_elem));
 			copy_to_user(&user_cmd->list_resp.elem_count,
 				&cmd->args.list_resp.elem_count,
@@ -104,9 +109,8 @@ static void wait_and_give_resp(struct ksh_cmd *cmd, cmd_io_t *user_cmd) {
 }
 
 static void  worker_list(struct work_struct *wk) {
-	cmd_list_elem cmd_info;
 	unsigned int list_size;
-	int i;
+	unsigned int i;
 	struct ksh_cmd *iter;
 	struct ksh_cmd *cmd = container_of(wk, struct ksh_cmd, work);
 
@@ -126,8 +130,9 @@ static void  worker_list(struct work_struct *wk) {
 			break;
 		}
 		cmd->args.list_resp.list[i].cmd_type = iter->args.ioctl_type;
-		cmd->args.list_resp.list[i].cmd_type.is_async = iter->args.is_async;
-		cmd->args.list_resp.list[i].cmd_type.cmd_id = iter->cmd_id;
+		cmd->args.list_resp.list[i].is_async = iter->args.is_async;
+		cmd->args.list_resp.list[i].cmd_id = iter->cmd_id;
+		pr_info("%d list %d %hu %lu", i, iter->args.ioctl_type, iter->args.is_async, iter->cmd_id);
 		i++;
 	}
 
@@ -158,7 +163,7 @@ static int handle_fg(struct ksh_cmd *cmd) {
 	mutex_unlock(&ksh_ctx->lock_ctx);
 
 	if(found == NULL) {
-		pr_info("Unable to find cmd_id: %d\n", cmd->args.fg_args.cmd_id);
+		pr_info("Unable to find cmd_id: %lu\n", cmd->args.fg_args.cmd_id);
 		return -1;
 	} else {
 		wait_and_give_resp(found, cmd->user_cmd);
@@ -285,7 +290,7 @@ static long ksh_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 		case IO_LIST:
 			arg_length = user_cmd->list_args.list_size;
 			new_cmd->args.list_resp.list = (cmd_list_elem *) 
-				kmalloc(arg_length * sizeof(cmd_list_elem));
+				kmalloc(arg_length * sizeof(cmd_list_elem), GFP_KERNEL);
 			if(new_cmd->args.list_resp.list == NULL) {
 				pr_info("kmalloc failed, aborting ioctl operation\n");
 				kfree(new_cmd);
@@ -298,7 +303,8 @@ static long ksh_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 			//INIT_WORK(&(new_cmd->work), worker_fg);
 			//schedule_work(&new_cmd->work);
 			handle_fg(new_cmd);
-			return;
+			remove_from_cmd_list(new_cmd);
+			return err;
 		case IO_KILL:
 			INIT_WORK(&(new_cmd->work), worker_kill);
 			schedule_work(&new_cmd->work);
