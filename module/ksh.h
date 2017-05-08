@@ -53,9 +53,15 @@ typedef struct {
 } cmd_wait_resp;
 
 typedef struct {
-	unsigned long total;
-	unsigned long free;
-	unsigned long used;
+	unsigned long sharedram;
+	unsigned long totalram;
+	unsigned long freeram;
+	unsigned long totalhigh;
+	unsigned long freehigh;
+	unsigned long bufferram;
+	unsigned long cached;
+	unsigned long totalswap;
+	unsigned long freeswap;
 } cmd_meminfo_resp;
 
 typedef struct {
