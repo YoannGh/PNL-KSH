@@ -1,4 +1,4 @@
-KSH: Kernel shell
+KSH: Kernel shell (https://github.com/y0koz/PNL-KSH)
 
 KSH est un outil permettant d'intéragir avec le noyau via l'appel système
 ioctl() afin de lui faire exécuter des commandes.
