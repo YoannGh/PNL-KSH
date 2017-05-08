@@ -40,16 +40,19 @@ Les autres commandes intéragissant avaec le module étant:
 
 -list: permet de lister les commandes en cours d'exécution en renvoyant pour chacune son identifiant, le type de commande ainsi qu'un flag indiquant s'il s'agit d'une commande asynchrone ou non.
 
--fg: permet de remettre au premier plan une commande exécutée en tâche de fond (commande asynchrone) afin d'obtenir son résultat.
+-fg <id>: permet de remettre au premier plan une commande exécutée en tâche de fond (commande asynchrone) afin d'obtenir son résultat.
 
 -kill <signal> <pid>: permet d'envoyer un signal à un processus de la même manière que l'outil kill.
 
--wait <pid> [<pid>...]: Permet d'attendre que l'un des processus passé en paramètre se termine et renvoie son code de terminaison.
+-wait <pid> [<pid>...]: Permet d'attendre que l'un des processus passés en paramètre se termine et renvoie son code de terminaison.
 
--meminfo : renvoie des informations relatives à l'état de la mémoire
--modinfo <module> renvoie des informations relatives au module <module>
-note: chaque commande peut être lancée en tache de fin en rajoutant "&" derrière le nom de chaque commande.
+-meminfo: renvoie des informations relatives à l'état de la mémoire et du swap.
 
-RAPPORT
+-modinfo <module_name>: renvoie des informations relatives au module passé en paramètre tels que son nom, sa version, son adresse de chargement ainsi que les arguments qu'il utilise.
 
-Toute les commandes demandées dans le sujet sont implantées correctement et fonctionnent en mode synchrone et asynchrone
+Note: Les commandes list, kill, meminfo et modinfo peuvent être lancées en tâche de fond (mode asynchrone) en rajoutant "&" à la fin de chaque commande dans le shell de l'outil.
+Les commandes fg et wait, n'implémentent pas de mode asynchrone puisqu'elles ont pour vocation d'être bloquantes, donc synchrones.
+
+SPÉCIFICITÉS D'IMPLÉMENTATION:
+
+
