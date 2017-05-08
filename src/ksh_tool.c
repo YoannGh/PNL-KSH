@@ -236,11 +236,10 @@ void cmd_list(int ioctl_fd, arg_t *args)
 	unsigned int list_size;
 	printf("Exec list: async=%hu\n", args[0].is_async);
 
-	cmd.ioctl_type = IO_LIST;
 	cmd.is_async = args[0].is_async;
 
 	if (ioctl(ioctl_fd, IO_LIST_SIZE, &list_size) == -1) {
-		puts("ioctl list failed");
+		puts("ioctl list_size failed");
 		return;
 	}
 
@@ -254,7 +253,7 @@ void cmd_list(int ioctl_fd, arg_t *args)
 
 	cmd.list_resp.list = (cmd_list_elem *) malloc(list_size * sizeof(cmd_list_elem));
 
-	if (ioctl(ioctl_fd, cmd.ioctl_type, &cmd) == -1) {
+	if (ioctl(ioctl_fd, IO_LIST, &cmd) == -1) {
 		puts("ioctl list failed");
 		return;
 	}
@@ -271,7 +270,9 @@ void cmd_list(int ioctl_fd, arg_t *args)
 
 void cmd_fg(int ioctl_fd, arg_t *args)
 {
-	cmd_io_t cmd;
+	cmd_io_t cmd_type;
+	cmd_io_t cmd_fg;
+	int list_size;
 	printf("Exec fg: async=%hu id=%d\n", args[0].is_async, args[1].c);
 
 	if(args[0].is_async) {
@@ -279,33 +280,72 @@ void cmd_fg(int ioctl_fd, arg_t *args)
 		return;
 	}
 
-	cmd.ioctl_type = IO_FG;
-	cmd.is_async = args[0].is_async;
-	cmd.fg_args.cmd_id = args[1].c;
+	cmd_type.is_async = args[0].is_async;
+	cmd_type.fg_args.cmd_id = args[1].c;
 
-	if (ioctl(ioctl_fd, cmd.ioctl_type, &cmd) == -1) {
-		puts("ioctl fg failed");
+	cmd_fg.is_async = args[0].is_async;
+	cmd_fg.fg_args.cmd_id = args[1].c;
+
+	if (ioctl(ioctl_fd, IO_FG_TYPE, &cmd_type) == -1) {
+		puts("ioctl fg_type failed");
 		return;
 	}
 
-	switch(cmd.ioctl_type) {
+	switch(cmd_type.fg_type_resp.fg_cmd_type) {
 		case IO_LIST:
-			handle_print_list(&cmd.list_resp);
+			if (ioctl(ioctl_fd, IO_LIST_SIZE, &list_size) == -1) {
+				puts("ioctl list_size failed");
+				return;
+			}
+			if(list_size == 0) {
+				printf("There is currently no running commands\n");
+				return;
+			}
+			printf("list_size 1er ioctl: %d\n", list_size);
+
+			cmd_fg.fg_args.cmd_id = args[1].c;
+
+			cmd_fg.list_resp.list = (cmd_list_elem *) malloc(list_size * sizeof(cmd_list_elem));
+
+			if (ioctl(ioctl_fd, IO_FG, &cmd_fg) == -1) {
+				puts("ioctl fg failed");
+				free(cmd_fg.list_resp.list);
+				return;
+			}
+
+			handle_print_list(&cmd_fg.list_resp);
+			free(cmd_fg.list_resp.list);
 			break;
 		case IO_FG:
 			puts("FG received FG response, shouldnt happen");
 			break;
 		case IO_KILL:
-			handle_print_kill(&cmd.kill_resp);
+			if (ioctl(ioctl_fd, IO_FG, &cmd_fg) == -1) {
+				puts("ioctl fg failed");
+				return;
+			}
+			handle_print_kill(&cmd_fg.kill_resp);
 			break;
 		case IO_WAIT:
-			handle_print_wait(&cmd.wait_resp);
+			if (ioctl(ioctl_fd, IO_FG, &cmd_fg) == -1) {
+				puts("ioctl fg failed");
+				return;
+			}
+			handle_print_wait(&cmd_fg.wait_resp);
 			break;
 		case IO_MEM:
-			handle_print_meminfo(&cmd.meminfo_resp);
+			if (ioctl(ioctl_fd, IO_FG, &cmd_fg) == -1) {
+				puts("ioctl fg failed");
+				return;
+			}
+			handle_print_meminfo(&cmd_fg.meminfo_resp);
 			break;
 		case IO_MOD:
-			handle_print_modinfo(&cmd.modinfo_resp);
+			if (ioctl(ioctl_fd, IO_FG, &cmd_fg) == -1) {
+				puts("ioctl fg failed");
+				return;
+			}
+			handle_print_modinfo(&cmd_fg.modinfo_resp);
 			break;
 		default:
 			puts("Unknown response");
@@ -318,12 +358,11 @@ void cmd_kill(int ioctl_fd, arg_t *args)
 	cmd_io_t cmd;
 	printf("Exec kill: async=%hu signal=%d pid=%d\n", args[0].is_async, args[1].c, args[2].c);
 
-	cmd.ioctl_type = IO_KILL;
 	cmd.is_async = args[0].is_async;
 	cmd.kill_args.signal = args[1].c;
 	cmd.kill_args.pid = args[2].c;
 
-	if (ioctl(ioctl_fd, cmd.ioctl_type, &cmd) == -1) {
+	if (ioctl(ioctl_fd, IO_KILL, &cmd) == -1) {
 		puts("ioctl kill failed");
 		return;
 	}
@@ -345,12 +384,11 @@ void cmd_wait(int ioctl_fd, arg_t *args)
 	}
 	printf("\n");
 
-	cmd.ioctl_type = IO_WAIT;
 	cmd.is_async = args[0].is_async;
 	cmd.wait_args.pid_count = args[1].l.count;
 	cmd.wait_args.pids = args[1].l.pids;
 
-	if (ioctl(ioctl_fd, cmd.ioctl_type, &cmd) == -1) {
+	if (ioctl(ioctl_fd, IO_WAIT, &cmd) == -1) {
 		puts("ioctl kill failed");
 		return;
 	}
@@ -368,10 +406,9 @@ void cmd_meminfo(int ioctl_fd, arg_t *args)
 	cmd_io_t cmd;
 	printf("Exec meminfo: async=%hu\n", args[0].is_async);
 
-	cmd.ioctl_type = IO_MEM;
 	cmd.is_async = args[0].is_async;
 
-	if (ioctl(ioctl_fd, cmd.ioctl_type, &cmd) == -1) {
+	if (ioctl(ioctl_fd, IO_MEM, &cmd) == -1) {
 		puts("ioctl meminfo failed");
 		return;
 	}
@@ -393,12 +430,11 @@ void cmd_modinfo(int ioctl_fd, arg_t *args)
 	length = strcspn(args[1].s, " \0");
 	args[1].s[length] = '\0';
 
-	cmd.ioctl_type = IO_MOD;
 	cmd.is_async = args[0].is_async;
 	cmd.modinfo_args.str_len = length + 1;
 	cmd.modinfo_args.str_ptr = args[1].s;
 
-	if (ioctl(ioctl_fd, cmd.ioctl_type, &cmd) == -1) {
+	if (ioctl(ioctl_fd, IO_MOD, &cmd) == -1) {
 		puts("ioctl modinfo failed");
 		return;
 	}

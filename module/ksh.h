@@ -40,6 +40,10 @@ typedef struct {
 } cmd_list_resp;
 
 typedef struct {
+	unsigned int fg_cmd_type;
+} cmd_fg_type_resp;
+
+typedef struct {
 	int ret;
 } cmd_kill_resp;
 
@@ -61,18 +65,10 @@ typedef struct {
 	unsigned long mapped_addr;
 } cmd_modinfo_resp;
 
-/*typedef union {
-	cmd_list_resp list_resp;
-	cmd_wait_resp wait_resp;
-	cmd_meminfo_resp meminfo_resp;
-	cmd_modinfo_resp modinfo_resp;
-} cmd_fg_resp;*/
-
 /* cmd_io_t: struct for communication between user and kernel space */
 
 typedef struct {
 	/* IN args */
-	int ioctl_type;
 	union {
 		cmd_list_args list_args;
 		cmd_fg_args fg_args;
@@ -84,6 +80,7 @@ typedef struct {
 	/* OUT Args */
 	union {
 		cmd_list_resp list_resp;
+		cmd_fg_type_resp fg_type_resp;
 		cmd_kill_resp kill_resp;
 		cmd_wait_resp wait_resp;
 		cmd_meminfo_resp meminfo_resp;
@@ -101,7 +98,8 @@ typedef struct {
 #define IO_MEM _IOWR(KSH_IOC_MAGIC, 5, cmd_io_t)
 #define IO_MOD _IOWR(KSH_IOC_MAGIC, 6, cmd_io_t)
 #define IO_LIST_SIZE _IOR(KSH_IOC_MAGIC, 7, unsigned int)
+#define IO_FG_TYPE _IOR(KSH_IOC_MAGIC, 8, cmd_io_t)
 
-#define KSH_IOC_MAXNR 7
+#define KSH_IOC_MAXNR 8
 
 #endif
