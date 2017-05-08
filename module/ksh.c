@@ -37,6 +37,7 @@
 
 MODULE_DESCRIPTION("Module ksh pour noyau linux");
 MODULE_AUTHOR("F et Y, M1SAR");
+MODULE_VERSION("0.4.2");
 MODULE_LICENSE("GPL");
 
 struct ksh_ctx {
@@ -52,7 +53,10 @@ struct ksh_cmd {
 	unsigned int cmd_type;
 	cmd_io_t args;
 	struct list_head l_next;
-	struct work_struct work;
+	union {
+		struct work_struct work;
+		struct delayed_work dwork;
+	};
     unsigned long cmd_id;
     wait_queue_head_t wait_done;
     unsigned short is_finished;
@@ -102,7 +106,7 @@ static void wait_and_give_resp(struct ksh_cmd *cmd, struct ksh_cmd *give_to) {
 			kfree(cmd->args.list_resp.list);
 			break;
 		case IO_FG:
-			pr_info("TODO fg resp\n");
+			pr_info("Should not wait for async FG\n");
 			break;
 		case IO_KILL:
 			copy_to_user(&give_to->user_cmd->kill_resp.ret, 
@@ -117,7 +121,13 @@ static void wait_and_give_resp(struct ksh_cmd *cmd, struct ksh_cmd *give_to) {
 				&cmd->args.meminfo_resp, sizeof(cmd_meminfo_resp));
 			break;
 		case IO_MOD:
+			copy_to_user(give_to->user_cmd->modinfo_resp.res_buffer,
+				cmd->args.modinfo_resp.res_buffer, 
+				cmd->args.modinfo_resp.res_buf_size * sizeof(char));
+			copy_to_user(&give_to->user_cmd->modinfo_resp.ret,
+				&cmd->args.modinfo_resp.ret, sizeof(int));
 			kfree(cmd->args.modinfo_args.str_ptr);
+			kfree(cmd->args.modinfo_resp.res_buffer);
 			break;
 		default:
 			return;
@@ -260,10 +270,69 @@ static void worker_meminfo(struct work_struct *wk) {
 }
 
 static void worker_modinfo(struct work_struct *wk) {
+	struct module *module_s;
+	int written;
+	int buf_size;
+	int bytes_left;
+	char *buf;
 	struct ksh_cmd *cmd = container_of(wk, struct ksh_cmd, work);
 
 	pr_info("worker_modinfo: is_async=%hu modname=%s\n", cmd->args.is_async,
 		cmd->args.modinfo_args.str_ptr);
+
+	buf = cmd->args.modinfo_resp.res_buffer;
+	buf_size = cmd->args.modinfo_resp.res_buf_size;
+	bytes_left = buf_size;
+	written = 0;
+
+	if (mutex_lock_interruptible(&module_mutex) != 0) {
+		pr_info("Retrying lock module_mutex\n");
+		schedule_delayed_work(&cmd->dwork, HZ);
+		return;
+	}
+
+	module_s = find_module(cmd->args.modinfo_args.str_ptr);
+	if (module_s) {
+		do {
+			pr_info("mod nom: %s\n", module_s->name);
+			bytes_left = buf_size - written;
+			written += scnprintf(&buf[written], bytes_left, 
+				"Name: %s\n", module_s->name);
+			if(written + 1 >= buf_size)
+				break;
+
+			pr_info("mod version: %s\n", module_s->version);
+			bytes_left = buf_size - written;
+			written += scnprintf(&buf[written], bytes_left, 
+				"Version: %s\n", module_s->version);
+			if(written + 1 >= buf_size)
+				break;
+
+			pr_info("mod load addr: 0x%p\n", module_s->module_core);
+			bytes_left = buf_size - written;
+			written += scnprintf(&buf[written], bytes_left, 
+				"Load addr: %p\n", module_s->module_core);
+			if(written + 1 >= buf_size)
+				break;
+
+			if(module_s->args) {
+				pr_info("mod args: %s\n", module_s->args);
+				bytes_left = buf_size - written;
+				written += scnprintf(&buf[written], bytes_left, 
+					"Arguments: %s\n", module_s->args);
+				if(written + 1 >= buf_size)
+					break;
+			}
+
+		} while (0);
+
+		buf[buf_size-1] = '\0';
+		cmd->args.modinfo_resp.ret = 0;
+	} else {
+		cmd->args.modinfo_resp.ret = -1;
+	}
+
+	mutex_unlock(&module_mutex);
 
 	cmd->is_finished = 1;
 	wake_up(&cmd->wait_done);
@@ -355,7 +424,7 @@ static long ksh_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 				kfree(new_cmd);
 				return -1;
 			}
-			INIT_WORK(&(new_cmd->work), worker_list);
+			INIT_WORK(&new_cmd->work, worker_list);
 			schedule_work(&new_cmd->work);
 			break;
 		case IO_FG:
@@ -363,7 +432,7 @@ static long ksh_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 			handle_fg(new_cmd);
 			return err;
 		case IO_KILL:
-			INIT_WORK(&(new_cmd->work), worker_kill);
+			INIT_WORK(&new_cmd->work, worker_kill);
 			schedule_work(&new_cmd->work);
 			break;
 		case IO_WAIT:
@@ -379,11 +448,11 @@ static long ksh_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 			err = copy_from_user(new_cmd->args.wait_args.pids, 
 				user_cmd->wait_args.pids, sizeof(int)*arg_length);
 
-			INIT_WORK(&(new_cmd->work), worker_wait);
+			INIT_WORK(&new_cmd->work, worker_wait);
 			schedule_work(&new_cmd->work);
 			break;
 		case IO_MEM:
-			INIT_WORK(&(new_cmd->work), worker_meminfo);
+			INIT_WORK(&new_cmd->work, worker_meminfo);
 			schedule_work(&new_cmd->work);
 			break;
 		case IO_MOD:
@@ -399,8 +468,20 @@ static long ksh_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
 			err = copy_from_user(new_cmd->args.modinfo_args.str_ptr, 
 				user_cmd->modinfo_args.str_ptr, sizeof(char) * arg_length);
 
-			INIT_WORK(&(new_cmd->work), worker_modinfo);
-			schedule_work(&new_cmd->work);
+			arg_length = new_cmd->args.modinfo_resp.res_buf_size;
+			new_cmd->args.modinfo_resp.res_buffer = (char *) 
+				kmalloc(arg_length * sizeof(char), GFP_KERNEL);
+			if(new_cmd->args.modinfo_resp.res_buffer == NULL) {
+				pr_info("kmalloc failed, aborting ioctl operation\n");
+				kfree(new_cmd->args.modinfo_args.str_ptr);
+				kfree(new_cmd);
+				return -1;
+			}
+
+			//INIT_WORK(&(new_cmd->work), worker_modinfo);
+			//schedule_work(&new_cmd->work);
+			INIT_DELAYED_WORK(&new_cmd->dwork, worker_modinfo);
+			schedule_delayed_work(&new_cmd->dwork, 0);
 			break;
 		default:
 			return -ENOTTY;

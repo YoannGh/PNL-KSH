@@ -65,10 +65,9 @@ typedef struct {
 } cmd_meminfo_resp;
 
 typedef struct {
-	unsigned int module_name_length;
-	char *module_name;
-	unsigned long version;
-	unsigned long mapped_addr;
+	char *res_buffer;
+	int ret;
+	unsigned int res_buf_size;
 } cmd_modinfo_resp;
 
 /* cmd_io_t: struct for communication between user and kernel space */

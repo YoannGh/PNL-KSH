@@ -60,7 +60,7 @@ cmd_t cmd_table[CMD_COUNT] ={
     CMD(kill, "<signal> <pid>", "Send 'signal' to process corresponding to 'pid'", KILL),
     CMD(wait, "<pid> [<pid> ...]", "Wait for one process specified by its 'pid' to terminate", WAIT),
     CMD(meminfo, "", "Get information concerning memory usage", MEMINFO),
-    CMD(modinfo, "<module>", "Get information concerning loaded kernel 'module'", MODINFO),
+    CMD(modinfo, "<module>", "Get information concerning loaded kernel 'module' (no extension)", MODINFO),
     CMD(help, "", "Display this help", HELP),
     CMD(exit, "", "Exit this tool", EXIT),
 };
@@ -341,16 +341,22 @@ void cmd_fg(int ioctl_fd, arg_t *args)
 			handle_print_meminfo(&cmd_fg.meminfo_resp);
 			break;
 		case IO_MOD:
+			cmd_fg.modinfo_resp.res_buf_size = 4096;
+
+			cmd_fg.modinfo_resp.res_buffer = (char *) 
+				malloc(cmd_fg.modinfo_resp.res_buf_size * sizeof(char));
+
 			if (ioctl(ioctl_fd, IO_FG, &cmd_fg) == -1) {
 				puts("ioctl fg failed");
 				return;
 			}
 			handle_print_modinfo(&cmd_fg.modinfo_resp);
+			free(cmd_fg.modinfo_resp.res_buffer);
 			break;
 		case -1:
 			printf("Command id %d not found\n", args[1].c);
 		default:
-			puts("Unknown response");
+			puts("Unknown module response");
 			break;
 	}
 }
@@ -429,12 +435,18 @@ void cmd_modinfo(int ioctl_fd, arg_t *args)
 	unsigned int length;
 	printf("Exec modinfo: async=%hu module_name=%s\n", args[0].is_async, args[1].s);
 
-	length = strcspn(args[1].s, " \0");
+	length = strcspn(args[1].s, " \r\n\0");
 	args[1].s[length] = '\0';
 
 	cmd.is_async = args[0].is_async;
 	cmd.modinfo_args.str_len = length + 1;
 	cmd.modinfo_args.str_ptr = args[1].s;
+	printf("dMODINFO: is_async=%hu modname=%s length=%d\n", cmd.is_async, cmd.modinfo_args.str_ptr, cmd.modinfo_args.str_len);
+
+	cmd.modinfo_resp.res_buf_size = 4096;
+
+	cmd.modinfo_resp.res_buffer = (char *) 
+		malloc(cmd.modinfo_resp.res_buf_size * sizeof(char));
 
 	if (ioctl(ioctl_fd, IO_MOD, &cmd) == -1) {
 		puts("ioctl modinfo failed");
@@ -447,6 +459,8 @@ void cmd_modinfo(int ioctl_fd, arg_t *args)
 	} else {
 		handle_print_modinfo(&cmd.modinfo_resp);
 	}
+
+	free(cmd.modinfo_resp.res_buffer);
 }
 
 void cmd_exit(int ioctl_fd, arg_t *args) 
@@ -531,21 +545,27 @@ void handle_print_wait(cmd_wait_resp *wait_resp) {
 }
 
 void handle_print_modinfo(cmd_modinfo_resp *modinfo_resp) {
-	puts("TODO: handle_print_wait");
+	if(modinfo_resp->ret < 0) {
+		printf("Module not found\n");
+	} else {
+		printf("%s\n", modinfo_resp->res_buffer);
+	}
 }
 
 char* readable_size(unsigned long size, char *buf, int buffer_size) {
     int i = 0;
-    const char* units[] = {"o", "Ko", "Mo", "Go", "To", "Po", "Eo", "Zo", "Yo"};
+    const char* units[] = {"b", "Kb", "Mb", "Gb", "Tb", "Pb", "Eb", "Zb", "Yb"};
     while (size > 1024) {
         size /= 1024;
         i++;
     }
 
-    if(!i)
-    	i = 1;
+    if(!i) {
+    	snprintf(buf, buffer_size, "0%s", units[i]);
+    } else {
+    	snprintf(buf, buffer_size, "%.*lu%s", i, size, units[i]);
+    }
     
-    snprintf(buf, buffer_size, "%.*lu%s", i, size, units[i]);
     return buf;
 }
 
