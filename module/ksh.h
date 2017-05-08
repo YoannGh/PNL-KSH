@@ -49,7 +49,8 @@ typedef struct {
 
 typedef struct {
 	int pid;
-	int ret_value;
+	int exit_code;
+	int ret;
 } cmd_wait_resp;
 
 typedef struct {

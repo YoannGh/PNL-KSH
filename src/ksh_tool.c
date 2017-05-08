@@ -392,6 +392,11 @@ void cmd_wait(int ioctl_fd, arg_t *args)
 	}
 	printf("\n");
 
+	if(args[0].is_async) {
+		puts("wait command cannot run asynchronously :(");
+		return;
+	}
+
 	cmd.is_async = args[0].is_async;
 	cmd.wait_args.pid_count = args[1].l.count;
 	cmd.wait_args.pids = args[1].l.pids;
@@ -401,12 +406,7 @@ void cmd_wait(int ioctl_fd, arg_t *args)
 		return;
 	}
 
-	if(cmd.is_async) {
-		printf("Async Command running with id: %lu\n", cmd.cmd_id);
-		return;
-	} else {
-		handle_print_wait(&cmd.wait_resp);
-	}
+	handle_print_wait(&cmd.wait_resp);
 }
 
 void cmd_meminfo(int ioctl_fd, arg_t *args)
@@ -441,7 +441,6 @@ void cmd_modinfo(int ioctl_fd, arg_t *args)
 	cmd.is_async = args[0].is_async;
 	cmd.modinfo_args.str_len = length + 1;
 	cmd.modinfo_args.str_ptr = args[1].s;
-	printf("dMODINFO: is_async=%hu modname=%s length=%d\n", cmd.is_async, cmd.modinfo_args.str_ptr, cmd.modinfo_args.str_len);
 
 	cmd.modinfo_resp.res_buf_size = 4096;
 
@@ -541,7 +540,12 @@ void handle_print_kill(cmd_kill_resp *kill_resp) {
 }
 
 void handle_print_wait(cmd_wait_resp *wait_resp) {
-	puts("TODO: handle_print_wait");
+	if(wait_resp->ret < 0) {
+		printf("None of the given pid corresponds to a process\n");
+	} else {
+		printf("Process %d finished with an exit code of %d\n", 
+			wait_resp->pid, wait_resp->exit_code);
+	}
 }
 
 void handle_print_modinfo(cmd_modinfo_resp *modinfo_resp) {

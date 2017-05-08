@@ -21,13 +21,16 @@
 #include <linux/list.h>
 #include <linux/mutex.h>
 
-/*kill_pid*/
+/*kill_pid and task_struct*/
 #include <linux/sched.h>
 /* NSIG*/
 #include <asm/signal.h>
 
 /*wait_queue*/
 #include <linux/wait.h>
+
+/*find_get_pid & pid_task*/
+#include <linux/pid.h>
 
 /*meminfo*/
 #include <linux/mm.h>
@@ -110,14 +113,15 @@ static void wait_and_give_resp(struct ksh_cmd *cmd,
 			kfree(cmd->args.list_resp.list);
 			break;
 		case IO_FG:
-			pr_info("Should not wait for async FG\n");
+			pr_info("Shouldnt give response for async FG\n");
 			break;
 	case IO_KILL:
 			copy_to_user(&give_to->user_cmd->kill_resp.ret,
 				&cmd->args.kill_resp.ret, sizeof(int));
 			break;
 	case IO_WAIT:
-			pr_info("TODO wait resp\n");
+			copy_to_user(&give_to->user_cmd->wait_resp,
+				&cmd->args.wait_resp, sizeof(cmd_wait_resp));
 			kfree(cmd->args.wait_args.pids);
 			break;
 	case IO_MEM:
@@ -228,14 +232,48 @@ static void worker_kill(struct work_struct *wk)
 static void worker_wait(struct work_struct *wk)
 {
 	int i;
+	int pid_count;
+	int *pids;
+	int null_count;
+	struct pid *pid_s;
+	struct task_struct *task_s;
 	struct ksh_cmd *cmd = container_of(wk, struct ksh_cmd, work);
 
+	pid_count = cmd->args.wait_args.pid_count;
+	pids = cmd->args.wait_args.pids;
+	null_count = 0;
+
 	pr_info("worker_wait: is_async=%hu ", cmd->args.is_async);
-	for (i = 0; i < cmd->args.wait_args.pid_count; i++)
-		pr_info("pid=%d ", cmd->args.wait_args.pids[i]);
+	for (i = 0; i < pid_count; i++)
+		pr_info("pid=%d ", pids[i]);
 	pr_info("\n");
 
-	cmd->is_finished = 1;
+	for (i = 0; i < pid_count; i++) {
+		if((pid_s = find_get_pid(pids[i])) == NULL 
+			|| (task_s = pid_task(pid_s, PIDTYPE_PID)) == NULL) {
+			if(++null_count == pid_count) {
+				cmd->args.wait_resp.ret = -1;
+				cmd->is_finished = 1;
+				break;
+			}
+			continue;
+		}
+		if (!pid_alive(task_s)) {
+			pr_info("pid=%d finished\n", pids[i]);
+			cmd->args.wait_resp.pid = task_s->pid;
+			cmd->args.wait_resp.exit_code = task_s->exit_code;
+			cmd->args.wait_resp.ret = 0;
+			cmd->is_finished = 1;
+			break;
+		}
+	}
+
+	if(!cmd->is_finished) {
+		pr_info("Retrying wait in 5 seconds\n");
+		schedule_delayed_work(&cmd->dwork, 5*HZ);
+		return;
+	}
+
 	wake_up(&cmd->wait_done);
 }
 
@@ -387,8 +425,8 @@ static long ksh_ioctl(struct file *file, unsigned int cmd,
 
 	user_cmd = (cmd_io_t *) arg;
 
-	/* fg command cannot run asynchronously */
-	if (user_cmd->is_async && cmd == IO_FG)
+	/* fg and wait commands cannot run asynchronously */
+	if (user_cmd->is_async && (cmd == IO_FG || cmd == IO_WAIT))
 		return -ENOTTY;
 
 	if (cmd == IO_FG_TYPE) {
@@ -461,8 +499,10 @@ static long ksh_ioctl(struct file *file, unsigned int cmd,
 			err = copy_from_user(new_cmd->args.wait_args.pids,
 			user_cmd->wait_args.pids, sizeof(int)*arg_length);
 
-			INIT_WORK(&new_cmd->work, worker_wait);
-			schedule_work(&new_cmd->work);
+			//INIT_WORK(&new_cmd->work, worker_wait);
+			//schedule_work(&new_cmd->work);
+			INIT_DELAYED_WORK(&new_cmd->dwork, worker_wait);
+			schedule_delayed_work(&new_cmd->dwork, 0);
 			break;
 		case IO_MEM:
 			INIT_WORK(&new_cmd->work, worker_meminfo);
