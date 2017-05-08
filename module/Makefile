@@ -6,7 +6,7 @@ ifneq ($(KERNELRELEASE),)
   $(info obj-m: $(obj-m))
 else
 	
-  KERNELDIR = ~/Dev/M1/PNL/linux-4.2.3
+  KERNELDIR = /tmp/linux-4.2.3
   PWD := $(shell pwd)
   $(info KERNELDIR: $(KERNELDIR))
   $(info PWD: $(PWD))

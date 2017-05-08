@@ -8,7 +8,7 @@ KSH est découpé en 2 parties:
 	- un outil en mode utilisateur permettant d'intéragir avec le module,
 	  appelé ksh_tool
 
-Il a été développé sous Linux version 4.2.3.
+Il a été développé sous Linux version 4.2.3 patchée.
 
 COMPILATION: 
 
