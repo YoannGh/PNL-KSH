@@ -29,7 +29,7 @@
 /*wait_queue*/
 #include <linux/wait.h>
 
-/*find_get_pid & pid_task*/
+/*find_vpid & get_pid_task*/
 #include <linux/pid.h>
 
 /*meminfo*/
@@ -43,14 +43,20 @@ MODULE_AUTHOR("F et Y, M1SAR");
 MODULE_VERSION("0.4.2");
 MODULE_LICENSE("GPL");
 
-struct ksh_ctx {
+struct wait_ctx_s {
+	struct pid **pid_list;
+	struct task_struct **task_list;
+	unsigned short wait_already_executed;
+};
+
+struct ksh_ctx_s {
 	struct list_head cmd_list;
 	struct mutex lock_ctx;
 	unsigned long cmd_count;
 	unsigned int list_size;
 	int major_num;
 };
-static struct ksh_ctx *ksh_ctx;
+static struct ksh_ctx_s *ksh_ctx;
 
 struct ksh_cmd {
 	unsigned int cmd_type;
@@ -60,10 +66,11 @@ struct ksh_cmd {
 		struct work_struct work;
 		struct delayed_work dwork;
 	};
-    unsigned long cmd_id;
-    wait_queue_head_t wait_done;
-    unsigned short is_finished;
-    cmd_io_t *user_cmd;
+	unsigned long cmd_id;
+	wait_queue_head_t wait_done;
+	unsigned short is_finished;
+	cmd_io_t *user_cmd;
+	struct wait_ctx_s wait_ctx;
 };
 
 static void remove_from_cmd_list(struct ksh_cmd *cmd)
@@ -232,47 +239,71 @@ static void worker_kill(struct work_struct *wk)
 static void worker_wait(struct work_struct *wk)
 {
 	int i;
-	int pid_count;
-	int *pids;
 	int null_count;
+	unsigned short already_executed;
 	struct pid *pid_s;
 	struct task_struct *task_s;
+	struct pid **save_pid;
+	struct task_struct **save_task;
 	struct ksh_cmd *cmd = container_of(wk, struct ksh_cmd, work);
-
-	pid_count = cmd->args.wait_args.pid_count;
-	pids = cmd->args.wait_args.pids;
-	null_count = 0;
+	int pid_count = cmd->args.wait_args.pid_count;
+	int *pids = cmd->args.wait_args.pids;
 
 	pr_info("worker_wait: is_async=%hu ", cmd->args.is_async);
 	for (i = 0; i < pid_count; i++)
 		pr_info("pid=%d ", pids[i]);
 	pr_info("\n");
 
-	for (i = 0; i < pid_count; i++) {
-		if((pid_s = find_get_pid(pids[i])) == NULL 
-			|| (task_s = pid_task(pid_s, PIDTYPE_PID)) == NULL) {
-			if(++null_count == pid_count) {
+	null_count = 0;
+	already_executed = cmd->wait_ctx.wait_already_executed;
+	if(!already_executed) {
+		save_pid = (struct pid **) 
+		kmalloc(pid_count * sizeof(struct pid *), GFP_KERNEL);
+		save_task = (struct task_struct **) 
+		kmalloc(pid_count * sizeof(struct task_struct *), GFP_KERNEL);
+		cmd->wait_ctx.pid_list = save_pid;
+		cmd->wait_ctx.task_list = save_task;
+	} else {
+		save_pid = cmd->wait_ctx.pid_list;
+		save_task = cmd->wait_ctx.task_list;
+	}
+
+	for(i = 0; i < pid_count; i++) {
+		if((pid_s = find_vpid(pids[i])) == NULL) {
+			if(++null_count == pid_count && !already_executed) {
+				pr_info("All pids doesnt exist\n");
 				cmd->args.wait_resp.ret = -1;
 				cmd->is_finished = 1;
 				break;
 			}
-			continue;
-		}
-		if (!pid_alive(task_s)) {
-			pr_info("pid=%d finished\n", pids[i]);
-			cmd->args.wait_resp.pid = task_s->pid;
-			cmd->args.wait_resp.exit_code = task_s->exit_code;
-			cmd->args.wait_resp.ret = 0;
-			cmd->is_finished = 1;
-			break;
+			else if(already_executed && pid_s == NULL) {
+				pr_info("pid=%d finished\n", pids[i]);
+				if(save_task[i] != NULL) {
+					cmd->args.wait_resp.pid = save_task[i]->pid;
+					cmd->args.wait_resp.exit_code = save_task[i]->exit_code;
+				}
+				cmd->args.wait_resp.ret = 0;
+				cmd->is_finished = 1;
+				break;
+			} 
+		} else {
+			save_pid[i] = pid_s;
+			if((task_s = get_pid_task(pid_s, PIDTYPE_PID)) 
+				!= NULL) {
+				save_task[i] = task_s;
+			}
 		}
 	}
 
 	if(!cmd->is_finished) {
+		cmd->wait_ctx.wait_already_executed = 1;
 		pr_info("Retrying wait in 5 seconds\n");
 		schedule_delayed_work(&cmd->dwork, 5*HZ);
 		return;
 	}
+
+	kfree(cmd->wait_ctx.pid_list);
+	kfree(cmd->wait_ctx.task_list);
 
 	wake_up(&cmd->wait_done);
 }
@@ -286,8 +317,6 @@ static void worker_meminfo(struct work_struct *wk)
 	pr_info("worker_meminfo: is_async=%hu\n", cmd->args.is_async);
 
 	mem_data = &cmd->args.meminfo_resp;
-
-	/*mem_data = kmalloc(sizeof(cmd_meminfo_resp), GFP_KERNEL);*/
 
 	si_meminfo(&val);
 	/*si_swapinfo(&val);*/
@@ -308,9 +337,6 @@ static void worker_meminfo(struct work_struct *wk)
 
 	mem_data->totalswap = 0;
 	mem_data->freeswap = 0;
-
-	/*copy_to_user(&(cmd->args.meminfo_resp),mem_data, */
-	/*sizeof(cmd_meminfo_resp));*/
 
 	cmd->is_finished = 1;
 	wake_up(&cmd->wait_done);
@@ -499,6 +525,8 @@ static long ksh_ioctl(struct file *file, unsigned int cmd,
 			err = copy_from_user(new_cmd->args.wait_args.pids,
 			user_cmd->wait_args.pids, sizeof(int)*arg_length);
 
+			new_cmd->wait_ctx.wait_already_executed = 0;
+
 			//INIT_WORK(&new_cmd->work, worker_wait);
 			//schedule_work(&new_cmd->work);
 			INIT_DELAYED_WORK(&new_cmd->dwork, worker_wait);
@@ -560,7 +588,7 @@ static int __init ksh_init(void)
 {
 	pr_info("Init KSH IOCTL\n");
 
-	ksh_ctx = kmalloc(sizeof(struct ksh_ctx),
+	ksh_ctx = kmalloc(sizeof(struct ksh_ctx_s),
 		GFP_KERNEL);
 	if (ksh_ctx == NULL) {
 		pr_info("kmalloc failed, aborting ksh module init\n");
