@@ -1,0 +1,14 @@
+diff -rcNP backup/linux-4.2.3/mm/swapfile.c linux-4.2.3/mm/swapfile.c
+*** backup/linux-4.2.3/mm/swapfile.c	2015-10-03 13:52:18.000000000 +0200
+--- linux-4.2.3/mm/swapfile.c	2017-05-08 17:57:52.999559779 +0200
+***************
+*** 2578,2583 ****
+--- 2578,2585 ----
+  	spin_unlock(&swap_lock);
+  }
+  
++ EXPORT_SYMBOL(si_swapinfo);
++ 
+  /*
+   * Verify that a swap entry is valid and increment its swap map count.
+   *
