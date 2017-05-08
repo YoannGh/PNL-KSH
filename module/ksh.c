@@ -29,6 +29,10 @@
 //wait_queue
 #include <linux/wait.h>
 
+//meminfo
+#include <linux/mm.h>
+#define P2K(x) ((x) << (PAGE_SHIFT - 10))
+
 #include "ksh.h"
 
 MODULE_DESCRIPTION("Module ksh pour noyau linux");
@@ -217,8 +221,33 @@ static void worker_wait(struct work_struct *wk) {
 
 static void worker_meminfo(struct work_struct *wk) {
 	struct ksh_cmd *cmd = container_of(wk, struct ksh_cmd, work);
+	static struct sysinfo val;
+	cmd_meminfo_resp *mem_data;
 
 	pr_info("worker_meminfo: is_async=%hu\n", cmd->args.is_async);
+
+	mem_data = kmalloc(sizeof(cmd_meminfo_resp), GFP_KERNEL);
+
+	si_meminfo(&val);
+	/*si_swapinfo(&val);*/
+	/* si_swapinfo is not exported, cannot use it without changing kernel sources ! */
+
+	mem_data->sharedram = val.sharedram;
+	mem_data->totalram  = (unsigned long) P2K(val.totalram);
+	mem_data->freeram   = (unsigned long) P2K(val.freeram);
+	mem_data->totalhigh = (unsigned long) P2K(val.totalhigh);
+	mem_data->freehigh  = (unsigned long) P2K(val.freehigh);
+	mem_data->bufferram = (unsigned long) P2K(val.bufferram);
+	mem_data->cached    = (unsigned long) P2K(global_page_state(NR_FILE_PAGES)
+		- val.bufferram);
+
+	/*mem_data->totalswap = (unsigned long) P2K(val.totalswap);
+	mem_data->freeswap  = (unsigned long) P2K(val.freeswap);*/
+
+	mem_data->totalswap = 0;
+	mem_data->freeswap = 0;
+
+	copy_to_user(&(cmd->args.meminfo_resp),mem_data, sizeof(cmd_meminfo_resp));
 
 	cmd->is_finished = 1;
 	wake_up(&cmd->wait_done);

@@ -382,6 +382,10 @@ void cmd_meminfo(int ioctl_fd, arg_t *args)
 	} else {
 		handle_print_meminfo(&cmd.meminfo_resp);
 	}
+
+	printf("sharedram: %lu\ntotalram: %lu\nfreeram: %lu\ntotalhigh: %lu\nfreehigh: %lu\nbufferram: %lu\ncached: %lu\ntotalswap: %lu\nfreeswap: %lu\n"
+		,cmd.meminfo_resp.sharedram,cmd.meminfo_resp.totalram,cmd.meminfo_resp.freeram,cmd.meminfo_resp.totalhigh,cmd.meminfo_resp.freehigh,cmd.meminfo_resp.bufferram,cmd.meminfo_resp.cached,cmd.meminfo_resp.totalswap,cmd.meminfo_resp.freeswap);
+		
 }
 
 void cmd_modinfo(int ioctl_fd, arg_t *args)
