@@ -34,6 +34,7 @@
 
 /*meminfo*/
 #include <linux/mm.h>
+#include <linux/swap.h>
 #define P2K(x) ((x) << (PAGE_SHIFT - 10))
 
 #include "ksh.h"
@@ -319,7 +320,7 @@ static void worker_meminfo(struct work_struct *wk)
 	mem_data = &cmd->args.meminfo_resp;
 
 	si_meminfo(&val);
-	/*si_swapinfo(&val);*/
+	si_swapinfo(&val);
 	/* si_swapinfo is not exported, cannot
 	use it without changing kernel sources ! */
 
@@ -332,11 +333,9 @@ static void worker_meminfo(struct work_struct *wk)
 	mem_data->cached    = (unsigned long)
 	P2K(global_page_state(NR_FILE_PAGES) - val.bufferram);
 
-	/*mem_data->totalswap = (unsigned long) P2K(val.totalswap);
-	mem_data->freeswap  = (unsigned long) P2K(val.freeswap);*/
+	mem_data->totalswap = (unsigned long) P2K(val.totalswap);
+	mem_data->freeswap  = (unsigned long) P2K(val.freeswap);
 
-	mem_data->totalswap = 0;
-	mem_data->freeswap = 0;
 
 	cmd->is_finished = 1;
 	wake_up(&cmd->wait_done);
