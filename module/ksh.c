@@ -120,7 +120,7 @@ static void wait_and_give_resp(struct ksh_cmd *cmd,
 				sizeof(unsigned int));
 			kfree(cmd->args.list_resp.list);
 			break;
-		case IO_FG:
+	case IO_FG:
 			pr_debug("Weird, shouldnt give response for async FG\n");
 			break;
 	case IO_KILL:
@@ -139,7 +139,7 @@ static void wait_and_give_resp(struct ksh_cmd *cmd,
 			break;
 	case IO_MOD:
 		copy_to_user(give_to->user_cmd->modinfo_resp.res_buffer,
-			cmd->args.modinfo_resp.res_buffer, 
+			cmd->args.modinfo_resp.res_buffer,
 			cmd->args.modinfo_resp.res_buf_size * sizeof(char));
 		copy_to_user(&give_to->user_cmd->modinfo_resp.ret,
 			&cmd->args.modinfo_resp.ret, sizeof(int));
@@ -257,10 +257,10 @@ static void worker_wait(struct work_struct *wk)
 
 	null_count = 0;
 	already_executed = cmd->wait_ctx.wait_already_executed;
-	if(!already_executed) {
-		save_pid = (struct pid **) 
+	if (!already_executed) {
+		save_pid = (struct pid **)
 		kmalloc(pid_count * sizeof(struct pid *), GFP_KERNEL);
-		save_task = (struct task_struct **) 
+		save_task = (struct task_struct **)
 		kmalloc(pid_count * sizeof(struct task_struct *), GFP_KERNEL);
 		cmd->wait_ctx.pid_list = save_pid;
 		cmd->wait_ctx.task_list = save_task;
@@ -269,34 +269,35 @@ static void worker_wait(struct work_struct *wk)
 		save_task = cmd->wait_ctx.task_list;
 	}
 
-	for(i = 0; i < pid_count; i++) {
-		if((pid_s = find_vpid(pids[i])) == NULL) {
-			if(++null_count == pid_count && !already_executed) {
+	for (i = 0; i < pid_count; i++) {
+		pid_s = find_vpid(pids[i]);
+		if (pid_s == NULL) {
+			if (++null_count == pid_count && !already_executed) {
 				pr_debug("All pids doesnt exist\n");
 				cmd->args.wait_resp.ret = -1;
 				cmd->is_finished = 1;
 				break;
-			}
-			else if(already_executed && pid_s == NULL) {
+			} else if (already_executed && pid_s == NULL) {
 				pr_debug("pid=%d finished\n", pids[i]);
-				if(save_task[i] != NULL) {
-					cmd->args.wait_resp.pid = save_task[i]->pid;
-					cmd->args.wait_resp.exit_code = save_task[i]->exit_code;
+				if (save_task[i] != NULL) {
+					cmd->args.wait_resp.pid
+					= save_task[i]->pid;
+					cmd->args.wait_resp.exit_code
+					= save_task[i]->exit_code;
 				}
 				cmd->args.wait_resp.ret = 0;
 				cmd->is_finished = 1;
 				break;
-			} 
+			}
 		} else {
 			save_pid[i] = pid_s;
-			if((task_s = get_pid_task(pid_s, PIDTYPE_PID)) 
-				!= NULL) {
+			task_s = get_pid_task(pid_s, PIDTYPE_PID);
+			if (task_s != NULL)
 				save_task[i] = task_s;
-			}
 		}
 	}
 
-	if(!cmd->is_finished) {
+	if (!cmd->is_finished) {
 		cmd->wait_ctx.wait_already_executed = 1;
 		pr_debug("Retrying wait in 5 seconds\n");
 		schedule_delayed_work(&cmd->dwork, 5*HZ);
@@ -341,7 +342,8 @@ static void worker_meminfo(struct work_struct *wk)
 	wake_up(&cmd->wait_done);
 }
 
-static void worker_modinfo(struct work_struct *wk) {
+static void worker_modinfo(struct work_struct *wk)
+{
 	struct module *module_s;
 	int written;
 	int buf_size;
@@ -368,31 +370,32 @@ static void worker_modinfo(struct work_struct *wk) {
 		do {
 			pr_debug("mod nom: %s\n", module_s->name);
 			bytes_left = buf_size - written;
-			written += scnprintf(&buf[written], bytes_left, 
+			written += scnprintf(&buf[written], bytes_left,
 				"Name: %s\n", module_s->name);
-			if(written + 1 >= buf_size)
+			if (written + 1 >= buf_size)
 				break;
 
 			pr_debug("mod version: %s\n", module_s->version);
 			bytes_left = buf_size - written;
-			written += scnprintf(&buf[written], bytes_left, 
+			written += scnprintf(&buf[written], bytes_left,
 				"Version: %s\n", module_s->version);
-			if(written + 1 >= buf_size)
+			if (written + 1 >= buf_size)
 				break;
 
-			pr_debug("mod load addr: 0x%p\n", module_s->module_core);
+			pr_debug("mod load addr: 0x%p\n",
+				module_s->module_core);
 			bytes_left = buf_size - written;
-			written += scnprintf(&buf[written], bytes_left, 
+			written += scnprintf(&buf[written], bytes_left,
 				"Load addr: %p\n", module_s->module_core);
-			if(written + 1 >= buf_size)
+			if (written + 1 >= buf_size)
 				break;
 
-			if(module_s->args) {
+			if (module_s->args) {
 				pr_debug("mod args: %s\n", module_s->args);
 				bytes_left = buf_size - written;
-				written += scnprintf(&buf[written], bytes_left, 
+				written += scnprintf(&buf[written], bytes_left,
 					"Arguments: %s\n", module_s->args);
-				if(written + 1 >= buf_size)
+				if (written + 1 >= buf_size)
 					break;
 			}
 
@@ -507,7 +510,7 @@ static long ksh_ioctl(struct file *file, unsigned int cmd,
 			remove_from_cmd_list(new_cmd);
 			handle_fg(new_cmd);
 			return err;
-		case IO_KILL:
+	case IO_KILL:
 			INIT_WORK(&new_cmd->work, worker_kill);
 			schedule_work(&new_cmd->work);
 			break;
@@ -529,7 +532,7 @@ static long ksh_ioctl(struct file *file, unsigned int cmd,
 			INIT_DELAYED_WORK(&new_cmd->dwork, worker_wait);
 			schedule_delayed_work(&new_cmd->dwork, 0);
 			break;
-		case IO_MEM:
+	case IO_MEM:
 			INIT_WORK(&new_cmd->work, worker_meminfo);
 			schedule_work(&new_cmd->work);
 			break;
@@ -549,9 +552,9 @@ static long ksh_ioctl(struct file *file, unsigned int cmd,
 				sizeof(char) * arg_length);
 
 			arg_length = new_cmd->args.modinfo_resp.res_buf_size;
-			new_cmd->args.modinfo_resp.res_buffer = (char *) 
+			new_cmd->args.modinfo_resp.res_buffer = (char *)
 				kmalloc(arg_length * sizeof(char), GFP_KERNEL);
-			if(new_cmd->args.modinfo_resp.res_buffer == NULL) {
+			if (new_cmd->args.modinfo_resp.res_buffer == NULL) {
 				pr_debug("kmalloc failed, aborting ioctl operation\n");
 				kfree(new_cmd->args.modinfo_args.str_ptr);
 				kfree(new_cmd);
@@ -605,23 +608,25 @@ static void __exit ksh_exit(void)
 {
 	struct ksh_cmd *cmd;
 	struct ksh_cmd *cmd_safe;
+
 	pr_info("Exit ksh module\n");
 
 	unregister_chrdev(ksh_ctx->major_num, "ksh");
 
 	mutex_lock(&ksh_ctx->lock_ctx);
 
-	list_for_each_entry_safe(cmd, cmd_safe, &ksh_ctx->cmd_list, l_next) {
-		if(!cmd->is_finished) {
-			if(cmd->cmd_type == IO_WAIT || cmd->cmd_type == IO_MOD) {
+	list_for_each_entry_safe(cmd, cmd_safe,
+		&ksh_ctx->cmd_list, l_next) {
+		if (!cmd->is_finished) {
+			if (cmd->cmd_type == IO_WAIT ||
+				cmd->cmd_type == IO_MOD)
 				cancel_delayed_work_sync(&cmd->dwork);
-			} else {
+			else
 				cancel_work_sync(&cmd->work);
-			}
 		}
 		list_del(&cmd->l_next);
-        kfree(cmd);
-    }
+		kfree(cmd);
+	}
 
 	mutex_unlock(&ksh_ctx->lock_ctx);
 
