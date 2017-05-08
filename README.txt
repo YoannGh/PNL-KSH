@@ -57,6 +57,17 @@ Note: Les commandes list, kill, meminfo et modinfo peuvent être lancées en tâ
 Les commandes fg et wait, n'implémentent pas de mode asynchrone puisqu'elles ont pour vocation d'être bloquantes, donc synchrones.
 
 
+TRACES D'EXÉCUTIONS:
+
+3 traces d'exéctions sont disponibles à la racine du projet:
+
+trace-1.png montre principalement les commandes 'list', 'fg', 'kill', 'meminfo' et 'modinfo', en mode synchrone et asynchrone.
+
+trace-2.png est davantage centrée sur les commandes 'wait' et 'kill'.
+
+Enfin, trace-3.png montre la commande 'help' affichant les commandes implémentées par l'outil ksh_tool ainsi que leur description.
+
+
 SPÉCIFICITÉS D'IMPLÉMENTATION:
 
 Dans le module, toutes les commandes reçues, quelles soient synchrones ou asynchrones, sont exéctuées par un worker thread. 
