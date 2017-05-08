@@ -121,7 +121,7 @@ static void wait_and_give_resp(struct ksh_cmd *cmd,
 			kfree(cmd->args.list_resp.list);
 			break;
 		case IO_FG:
-			pr_info("Shouldnt give response for async FG\n");
+			pr_debug("Weird, shouldnt give response for async FG\n");
 			break;
 	case IO_KILL:
 			copy_to_user(&give_to->user_cmd->kill_resp.ret,
@@ -161,7 +161,7 @@ static void  worker_list(struct work_struct *wk)
 	struct ksh_cmd *iter;
 	struct ksh_cmd *cmd = container_of(wk, struct ksh_cmd, work);
 
-	pr_info("worker_list: is_async=%hu\n", cmd->args.is_async);
+	pr_debug("worker_list: is_async=%hu\n", cmd->args.is_async);
 
 	mutex_lock(&ksh_ctx->lock_ctx);
 
@@ -177,7 +177,7 @@ static void  worker_list(struct work_struct *wk)
 		cmd->args.list_resp.list[i].cmd_type = iter->cmd_type;
 		cmd->args.list_resp.list[i].is_async = iter->args.is_async;
 		cmd->args.list_resp.list[i].cmd_id = iter->cmd_id;
-		pr_info("%d list %d %hu %lu\n", i, iter->cmd_type,
+		pr_debug("%d list %d %hu %lu\n", i, iter->cmd_type,
 			iter->args.is_async, iter->cmd_id);
 		i++;
 	}
@@ -193,13 +193,13 @@ static int handle_fg(struct ksh_cmd *cmd)
 {
 	struct ksh_cmd *found;
 
-	pr_info("handle_fg: is_async=%hu id=%lu\n", cmd->args.is_async,
+	pr_debug("handle_fg: is_async=%hu id=%lu\n", cmd->args.is_async,
 		cmd->args.fg_args.cmd_id);
 
 	found = find_cmd_by_id(cmd->args.fg_args.cmd_id);
 
 	if (found == NULL) {
-		pr_info("Unable to find cmd_id: %lu\n",
+		pr_debug("Unable to find cmd_id: %lu\n",
 			cmd->args.fg_args.cmd_id);
 		return -1;
 	} else {
@@ -215,7 +215,7 @@ static void worker_kill(struct work_struct *wk)
 	int resp;
 	struct ksh_cmd *cmd = container_of(wk, struct ksh_cmd, work);
 
-	pr_info("worker_kill: is_async=%hu signal=%d pid=%d\n",
+	pr_debug("worker_kill: is_async=%hu signal=%d pid=%d\n",
 		cmd->args.is_async,
 		cmd->args.kill_args.signal,
 		cmd->args.kill_args.pid);
@@ -250,10 +250,10 @@ static void worker_wait(struct work_struct *wk)
 	int pid_count = cmd->args.wait_args.pid_count;
 	int *pids = cmd->args.wait_args.pids;
 
-	pr_info("worker_wait: is_async=%hu ", cmd->args.is_async);
+	pr_debug("worker_wait: is_async=%hu ", cmd->args.is_async);
 	for (i = 0; i < pid_count; i++)
-		pr_info("pid=%d ", pids[i]);
-	pr_info("\n");
+		pr_debug("pid=%d ", pids[i]);
+	pr_debug("\n");
 
 	null_count = 0;
 	already_executed = cmd->wait_ctx.wait_already_executed;
@@ -272,13 +272,13 @@ static void worker_wait(struct work_struct *wk)
 	for(i = 0; i < pid_count; i++) {
 		if((pid_s = find_vpid(pids[i])) == NULL) {
 			if(++null_count == pid_count && !already_executed) {
-				pr_info("All pids doesnt exist\n");
+				pr_debug("All pids doesnt exist\n");
 				cmd->args.wait_resp.ret = -1;
 				cmd->is_finished = 1;
 				break;
 			}
 			else if(already_executed && pid_s == NULL) {
-				pr_info("pid=%d finished\n", pids[i]);
+				pr_debug("pid=%d finished\n", pids[i]);
 				if(save_task[i] != NULL) {
 					cmd->args.wait_resp.pid = save_task[i]->pid;
 					cmd->args.wait_resp.exit_code = save_task[i]->exit_code;
@@ -298,7 +298,7 @@ static void worker_wait(struct work_struct *wk)
 
 	if(!cmd->is_finished) {
 		cmd->wait_ctx.wait_already_executed = 1;
-		pr_info("Retrying wait in 5 seconds\n");
+		pr_debug("Retrying wait in 5 seconds\n");
 		schedule_delayed_work(&cmd->dwork, 5*HZ);
 		return;
 	}
@@ -315,7 +315,7 @@ static void worker_meminfo(struct work_struct *wk)
 	static struct sysinfo val;
 	cmd_meminfo_resp *mem_data;
 
-	pr_info("worker_meminfo: is_async=%hu\n", cmd->args.is_async);
+	pr_debug("worker_meminfo: is_async=%hu\n", cmd->args.is_async);
 
 	mem_data = &cmd->args.meminfo_resp;
 
@@ -349,7 +349,7 @@ static void worker_modinfo(struct work_struct *wk) {
 	char *buf;
 	struct ksh_cmd *cmd = container_of(wk, struct ksh_cmd, work);
 
-	pr_info("worker_modinfo: is_async=%hu modname=%s\n",
+	pr_debug("worker_modinfo: is_async=%hu modname=%s\n",
 		cmd->args.is_async, cmd->args.modinfo_args.str_ptr);
 
 	buf = cmd->args.modinfo_resp.res_buffer;
@@ -358,7 +358,7 @@ static void worker_modinfo(struct work_struct *wk) {
 	written = 0;
 
 	if (mutex_lock_interruptible(&module_mutex) != 0) {
-		pr_info("Retrying lock module_mutex\n");
+		pr_debug("Retrying lock module_mutex\n");
 		schedule_delayed_work(&cmd->dwork, HZ);
 		return;
 	}
@@ -366,21 +366,21 @@ static void worker_modinfo(struct work_struct *wk) {
 	module_s = find_module(cmd->args.modinfo_args.str_ptr);
 	if (module_s) {
 		do {
-			pr_info("mod nom: %s\n", module_s->name);
+			pr_debug("mod nom: %s\n", module_s->name);
 			bytes_left = buf_size - written;
 			written += scnprintf(&buf[written], bytes_left, 
 				"Name: %s\n", module_s->name);
 			if(written + 1 >= buf_size)
 				break;
 
-			pr_info("mod version: %s\n", module_s->version);
+			pr_debug("mod version: %s\n", module_s->version);
 			bytes_left = buf_size - written;
 			written += scnprintf(&buf[written], bytes_left, 
 				"Version: %s\n", module_s->version);
 			if(written + 1 >= buf_size)
 				break;
 
-			pr_info("mod load addr: 0x%p\n", module_s->module_core);
+			pr_debug("mod load addr: 0x%p\n", module_s->module_core);
 			bytes_left = buf_size - written;
 			written += scnprintf(&buf[written], bytes_left, 
 				"Load addr: %p\n", module_s->module_core);
@@ -388,7 +388,7 @@ static void worker_modinfo(struct work_struct *wk) {
 				break;
 
 			if(module_s->args) {
-				pr_info("mod args: %s\n", module_s->args);
+				pr_debug("mod args: %s\n", module_s->args);
 				bytes_left = buf_size - written;
 				written += scnprintf(&buf[written], bytes_left, 
 					"Arguments: %s\n", module_s->args);
@@ -459,7 +459,7 @@ static long ksh_ioctl(struct file *file, unsigned int cmd,
 			&user_cmd->fg_args.cmd_id, sizeof(unsigned long));
 		found_cmd = find_cmd_by_id(cmd_id);
 		if (found_cmd == NULL) {
-			pr_info("Command with id: %lu not found\n", cmd_id);
+			pr_debug("Command with id: %lu not found\n", cmd_id);
 			tmp = -1;
 			err = copy_to_user(&user_cmd->fg_type_resp.fg_cmd_type,
 				&tmp, sizeof(int));
@@ -473,7 +473,7 @@ static long ksh_ioctl(struct file *file, unsigned int cmd,
 	new_cmd = (struct ksh_cmd *)
 	kmalloc(sizeof(struct ksh_cmd), GFP_KERNEL);
 	if (new_cmd == NULL) {
-		pr_info("kmalloc failed, aborting ioctl operation\n");
+		pr_debug("kmalloc failed, aborting ioctl operation\n");
 		return -1;
 	}
 
@@ -496,7 +496,7 @@ static long ksh_ioctl(struct file *file, unsigned int cmd,
 			new_cmd->args.list_resp.list = (cmd_list_elem *)
 			kmalloc(arg_length * sizeof(cmd_list_elem), GFP_KERNEL);
 			if (new_cmd->args.list_resp.list == NULL) {
-				pr_info("kmalloc failed, aborting ioctl operation\n");
+				pr_debug("kmalloc failed, aborting ioctl operation\n");
 				kfree(new_cmd);
 				return -1;
 			}
@@ -517,7 +517,7 @@ static long ksh_ioctl(struct file *file, unsigned int cmd,
 			new_cmd->args.wait_args.pids = (int *)
 				kmalloc(sizeof(int) * arg_length, GFP_KERNEL);
 			if (new_cmd->args.wait_args.pids == NULL) {
-				pr_info("kmalloc failed, aborting ioctl operation\n");
+				pr_debug("kmalloc failed, aborting ioctl operation\n");
 				kfree(new_cmd);
 				return -1;
 			}
@@ -539,7 +539,7 @@ static long ksh_ioctl(struct file *file, unsigned int cmd,
 			new_cmd->args.modinfo_args.str_ptr =
 				kmalloc(sizeof(char) * arg_length, GFP_KERNEL);
 			if (new_cmd->args.modinfo_args.str_ptr == NULL) {
-				pr_info("kmalloc failed, aborting ioctl operation\n");
+				pr_debug("kmalloc failed, aborting ioctl operation\n");
 				kfree(new_cmd);
 				return -1;
 			}
@@ -552,7 +552,7 @@ static long ksh_ioctl(struct file *file, unsigned int cmd,
 			new_cmd->args.modinfo_resp.res_buffer = (char *) 
 				kmalloc(arg_length * sizeof(char), GFP_KERNEL);
 			if(new_cmd->args.modinfo_resp.res_buffer == NULL) {
-				pr_info("kmalloc failed, aborting ioctl operation\n");
+				pr_debug("kmalloc failed, aborting ioctl operation\n");
 				kfree(new_cmd->args.modinfo_args.str_ptr);
 				kfree(new_cmd);
 				return -1;
@@ -586,12 +586,12 @@ static int __init ksh_init(void)
 	ksh_ctx = kmalloc(sizeof(struct ksh_ctx_s),
 		GFP_KERNEL);
 	if (ksh_ctx == NULL) {
-		pr_info("kmalloc failed, aborting ksh module init\n");
+		pr_debug("kmalloc failed, aborting ksh module init\n");
 		return -1;
 	}
 
 	ksh_ctx->major_num = register_chrdev(0, "ksh", &ksh_fops);
-	pr_info("ksh_ioctl major: %d\n", ksh_ctx->major_num);
+	pr_info("ksh chrdev major: %d\n", ksh_ctx->major_num);
 	INIT_LIST_HEAD(&(ksh_ctx->cmd_list));
 	ksh_ctx->cmd_count = 0;
 	ksh_ctx->list_size = 0;
