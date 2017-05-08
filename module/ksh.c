@@ -526,8 +526,6 @@ static long ksh_ioctl(struct file *file, unsigned int cmd,
 
 			new_cmd->wait_ctx.wait_already_executed = 0;
 
-			//INIT_WORK(&new_cmd->work, worker_wait);
-			//schedule_work(&new_cmd->work);
 			INIT_DELAYED_WORK(&new_cmd->dwork, worker_wait);
 			schedule_delayed_work(&new_cmd->dwork, 0);
 			break;
@@ -560,8 +558,6 @@ static long ksh_ioctl(struct file *file, unsigned int cmd,
 				return -1;
 			}
 
-			//INIT_WORK(&(new_cmd->work), worker_modinfo);
-			//schedule_work(&new_cmd->work);
 			INIT_DELAYED_WORK(&new_cmd->dwork, worker_modinfo);
 			schedule_delayed_work(&new_cmd->dwork, 0);
 			break;
@@ -585,7 +581,7 @@ static const struct file_operations ksh_fops = {
 
 static int __init ksh_init(void)
 {
-	pr_info("Init KSH IOCTL\n");
+	pr_info("Init ksh module\n");
 
 	ksh_ctx = kmalloc(sizeof(struct ksh_ctx_s),
 		GFP_KERNEL);
@@ -607,11 +603,28 @@ module_init(ksh_init);
 
 static void __exit ksh_exit(void)
 {
-	pr_info("Exit KSH IOCTL\n");
+	struct ksh_cmd *cmd;
+	struct ksh_cmd *cmd_safe;
+	pr_info("Exit ksh module\n");
 
 	unregister_chrdev(ksh_ctx->major_num, "ksh");
 
-	/*TODO: destroy les structs et kfree*/
+	mutex_lock(&ksh_ctx->lock_ctx);
+
+	list_for_each_entry_safe(cmd, cmd_safe, &ksh_ctx->cmd_list, l_next) {
+		if(!cmd->is_finished) {
+			if(cmd->cmd_type == IO_WAIT || cmd->cmd_type == IO_MOD) {
+				cancel_delayed_work_sync(&cmd->dwork);
+			} else {
+				cancel_work_sync(&cmd->work);
+			}
+		}
+		list_del(&cmd->l_next);
+        kfree(cmd);
+    }
+
+	mutex_unlock(&ksh_ctx->lock_ctx);
+
 	kfree(ksh_ctx);
 }
 module_exit(ksh_exit);
