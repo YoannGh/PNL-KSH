@@ -202,11 +202,11 @@ static int handle_fg(struct ksh_cmd *cmd)
 		pr_debug("Unable to find cmd_id: %lu\n",
 			cmd->args.fg_args.cmd_id);
 		return -1;
-	} else {
-		/* Give the response to the fg command */
-		wait_and_give_resp(found, cmd);
-		return 0;
 	}
+
+	/* Give the response to the fg command */
+	wait_and_give_resp(found, cmd);
+	return 0;
 }
 
 static void worker_kill(struct work_struct *wk)
@@ -433,9 +433,11 @@ static long ksh_ioctl(struct file *file, unsigned int cmd,
 		return -ENOTTY;
 
 	if (_IOC_DIR(cmd) & _IOC_READ)
-	    err = !access_ok(VERIFY_WRITE, (void __user *)arg, _IOC_SIZE(cmd));
+		err = !access_ok(VERIFY_WRITE,
+			(void __user *)arg, _IOC_SIZE(cmd));
 	else if (_IOC_DIR(cmd) & _IOC_WRITE)
-	    err =  !access_ok(VERIFY_READ, (void __user *)arg, _IOC_SIZE(cmd));
+		err =  !access_ok(VERIFY_READ,
+			(void __user *)arg, _IOC_SIZE(cmd));
 	if (err)
 		return -EFAULT;
 
@@ -588,10 +590,8 @@ static int __init ksh_init(void)
 
 	ksh_ctx = kmalloc(sizeof(struct ksh_ctx_s),
 		GFP_KERNEL);
-	if (ksh_ctx == NULL) {
-		pr_debug("kmalloc failed, aborting ksh module init\n");
+	if (ksh_ctx == NULL)
 		return -1;
-	}
 
 	ksh_ctx->major_num = register_chrdev(0, "ksh", &ksh_fops);
 	pr_info("ksh chrdev major: %d\n", ksh_ctx->major_num);
@@ -629,7 +629,6 @@ static void __exit ksh_exit(void)
 	}
 
 	mutex_unlock(&ksh_ctx->lock_ctx);
-
 	kfree(ksh_ctx);
 }
 module_exit(ksh_exit);
