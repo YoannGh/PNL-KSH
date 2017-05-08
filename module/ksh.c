@@ -113,6 +113,8 @@ static void wait_and_give_resp(struct ksh_cmd *cmd, struct ksh_cmd *give_to) {
 			kfree(cmd->args.wait_args.pids);
 			break;
 		case IO_MEM:
+			copy_to_user(&give_to->user_cmd->meminfo_resp, 
+				&cmd->args.meminfo_resp, sizeof(cmd_meminfo_resp));
 			break;
 		case IO_MOD:
 			kfree(cmd->args.modinfo_args.str_ptr);
@@ -228,7 +230,9 @@ static void worker_meminfo(struct work_struct *wk) {
 
 	pr_info("worker_meminfo: is_async=%hu\n", cmd->args.is_async);
 
-	mem_data = kmalloc(sizeof(cmd_meminfo_resp), GFP_KERNEL);
+	mem_data = &cmd->args.meminfo_resp;
+
+	//mem_data = kmalloc(sizeof(cmd_meminfo_resp), GFP_KERNEL);
 
 	si_meminfo(&val);
 	/*si_swapinfo(&val);*/
@@ -249,7 +253,7 @@ static void worker_meminfo(struct work_struct *wk) {
 	mem_data->totalswap = 0;
 	mem_data->freeswap = 0;
 
-	copy_to_user(&(cmd->args.meminfo_resp),mem_data, sizeof(cmd_meminfo_resp));
+	//copy_to_user(&(cmd->args.meminfo_resp),mem_data, sizeof(cmd_meminfo_resp));
 
 	cmd->is_finished = 1;
 	wake_up(&cmd->wait_done);

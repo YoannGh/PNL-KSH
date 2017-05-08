@@ -347,6 +347,8 @@ void cmd_fg(int ioctl_fd, arg_t *args)
 			}
 			handle_print_modinfo(&cmd_fg.modinfo_resp);
 			break;
+		case -1:
+			printf("Command id %d not found\n", args[1].c);
 		default:
 			puts("Unknown response");
 			break;
@@ -418,11 +420,7 @@ void cmd_meminfo(int ioctl_fd, arg_t *args)
 		return;
 	} else {
 		handle_print_meminfo(&cmd.meminfo_resp);
-	}
-
-	printf("sharedram: %lu\ntotalram: %lu\nfreeram: %lu\ntotalhigh: %lu\nfreehigh: %lu\nbufferram: %lu\ncached: %lu\ntotalswap: %lu\nfreeswap: %lu\n"
-		,cmd.meminfo_resp.sharedram,cmd.meminfo_resp.totalram,cmd.meminfo_resp.freeram,cmd.meminfo_resp.totalhigh,cmd.meminfo_resp.freehigh,cmd.meminfo_resp.bufferram,cmd.meminfo_resp.cached,cmd.meminfo_resp.totalswap,cmd.meminfo_resp.freeswap);
-		
+	}	
 }
 
 void cmd_modinfo(int ioctl_fd, arg_t *args)
@@ -532,10 +530,34 @@ void handle_print_wait(cmd_wait_resp *wait_resp) {
 	puts("TODO: handle_print_wait");
 }
 
-void handle_print_meminfo(cmd_meminfo_resp *meminfo_resp) {
-	puts("TODO: handle_print_meminfo");
-}
-
 void handle_print_modinfo(cmd_modinfo_resp *modinfo_resp) {
 	puts("TODO: handle_print_wait");
+}
+
+char* readable_size(unsigned long size, char *buf, int buffer_size) {
+    int i = 0;
+    const char* units[] = {"o", "Ko", "Mo", "Go", "To", "Po", "Eo", "Zo", "Yo"};
+    while (size > 1024) {
+        size /= 1024;
+        i++;
+    }
+
+    if(!i)
+    	i = 1;
+    
+    snprintf(buf, buffer_size, "%.*lu%s", i, size, units[i]);
+    return buf;
+}
+
+void handle_print_meminfo(cmd_meminfo_resp *meminfo_resp) {
+	char buf[128];
+	printf("sharedram: %s\n", readable_size(meminfo_resp->sharedram, &buf[0], 128));
+	printf("totalram: %s\n", readable_size(meminfo_resp->totalram, &buf[0], 128));
+	printf("freeram: %s\n", readable_size(meminfo_resp->freeram, &buf[0], 128));
+	printf("totalhigh: %s\n", readable_size(meminfo_resp->totalhigh, &buf[0], 128));
+	printf("freehigh: %s\n", readable_size(meminfo_resp->freehigh, &buf[0], 128));
+	printf("bufferram: %s\n", readable_size(meminfo_resp->bufferram, &buf[0], 128));
+	printf("cached: %s\n", readable_size(meminfo_resp->cached, &buf[0], 128));
+	printf("totalswap: %s\n", readable_size(meminfo_resp->totalswap, &buf[0], 128));
+	printf("freeswap: %s\n", readable_size(meminfo_resp->freeswap, &buf[0], 128));
 }
